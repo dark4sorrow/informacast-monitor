@@ -1,0 +1,103 @@
+import os
+import requests
+import datetime
+from flask import Flask, render_template, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
+from collections import Counter
+
+app = Flask(__name__)
+
+# Handle headers from Nginx on galacticbacon
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
+
+# --- CONFIGURATION ---
+DEFAULT_TOKEN = "FHIXRHKMSII6RPKVNXX5C733N5KRB4MQJSJBD2F5KUCWJYHHJKI4PJ4UZRUIQZGDDJPK7U7ACTMLNSHK2VHSZUFCFARTYFKDQTMQEQA="
+FUSION_API_TOKEN = os.getenv('FUSION_API_TOKEN', DEFAULT_TOKEN)
+BASE_URL = "https://api.icmobile.singlewire.com/api/v1"
+REQUEST_TIMEOUT = 30 
+
+class FusionClient:
+    def __init__(self, token):
+        self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+    def fetch_all_pages(self, endpoint):
+        """Recursively follows the 'next' URL to get thousands of endpoints."""
+        all_items = []
+        url = f"{BASE_URL}/{endpoint}"
+        
+        while url:
+            try:
+                response = requests.get(url, headers=self.headers, timeout=REQUEST_TIMEOUT)
+                response.raise_for_status()
+                payload = response.json()
+                
+                all_items.extend(payload.get('data', []))
+                # Follow the exact 'next' link provided by the InformaCast API
+                url = payload.get('next') 
+            except Exception as e:
+                print(f"Fetch failed: {e}")
+                break
+        return all_items
+
+client = FusionClient(FUSION_API_TOKEN)
+
+@app.route('/')
+def index():
+    return render_template('dashboard.html')
+
+@app.route('/api/analytics')
+def api_analytics():
+    devices = client.fetch_all_pages("devices")
+    notifications = client.fetch_all_pages("notifications")
+    
+    models = []
+    speaker_details = []
+    active = 0
+    defunct = 0
+    
+    for d in devices:
+        attrs = d.get('attributes', {})
+        model_name = attrs.get('InformaCastDeviceType', 'Unknown')
+        desc = (d.get('description') or '').upper()
+        is_defunct = d.get('defunct', False)
+        
+        if is_defunct: defunct += 1
+        else: active += 1
+        
+        models.append(model_name)
+        
+        # Comprehensive identification for Advanced Network Devices
+        if any(term in model_name.upper() for term in ['SPEAKER', 'AND', 'ADVANCED']) or \
+           any(term in desc for term in ['SPEAKER', 'AND']):
+            speaker_details.append({
+                'name': d.get('description') or 'Unnamed Speaker',
+                'ip': attrs.get('IPAddress', 'N/A'),
+                'status': "Active" if not is_defunct else "Defunct"
+            })
+            
+    return jsonify({
+        'device_models': dict(Counter(models)),
+        'activity_trend': dict(Counter([n.get('createdAt')[:10] for n in notifications if n.get('createdAt')])),
+        'speaker_details': speaker_details,
+        'summary': {
+            'total_devices': len(devices),
+            'online': active,
+            'defunct': defunct,
+            'speakers': len(speaker_details),
+            'total_broadcasts': len(notifications)
+        }
+    })
+
+@app.route('/api/devices')
+def api_devices():
+    data = client.fetch_all_pages("devices")
+    return jsonify({'data': [{
+        'name': d.get('description') or 'Unnamed Device',
+        'model': d.get('attributes', {}).get('InformaCastDeviceType', 'Generic Device'),
+        'ip': d.get('attributes', {}).get('IPAddress', 'N/A'),
+        'mac': d.get('attributes', {}).get('Name', 'N/A'),
+        'status': "Active" if not d.get('defunct') else "Defunct"
+    } for d in data]})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5082)
