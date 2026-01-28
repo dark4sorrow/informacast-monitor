@@ -28,9 +28,9 @@
     </div>
 
     <div class="row mb-4">
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3 text-center">Infrastructure</h6><div class="chart-lock"><canvas id="deviceChart"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3 text-center">Infrastructure Mix</h6><div class="chart-lock"><canvas id="deviceChart"></canvas></div></div></div>
         <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3 text-center">Broadcast Volume</h6><div class="chart-lock"><canvas id="trendChart"></canvas></div></div></div>
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3 text-center">Health Status</h6><div class="chart-lock"><canvas id="healthChart"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3 text-center">Endpoint Health</h6><div class="chart-lock"><canvas id="healthChart"></canvas></div></div></div>
     </div>
 
     <div class="card shadow-sm mb-4">
@@ -58,7 +58,7 @@
         charts.device = new Chart(document.getElementById('deviceChart'), { type: 'doughnut', data: { labels: Object.keys(data.device_models), datasets: [{ data: Object.values(data.device_models), backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b'] }] }, options: opt });
         charts.health = new Chart(document.getElementById('healthChart'), { type: 'pie', data: { labels: ['Online', 'Defunct'], datasets: [{ data: [data.summary.online, data.summary.defunct], backgroundColor: ['#1cc88a', '#e74a3b'] }] }, options: opt });
         const dates = Object.keys(data.activity_trend).sort();
-        charts.trend = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: dates, datasets: [{ label: 'Volume', data: dates.map(d => data.activity_trend[d]), borderColor: '#4e73df', tension: 0.3 }] }, options: opt });
+        charts.trend = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: dates, datasets: [{ label: 'Messages', data: dates.map(d => data.activity_trend[d]), borderColor: '#4e73df', tension: 0.3 }] }, options: opt });
     }
     function refreshData() {
         $('#syncBtn').prop('disabled', true).text('Syncing...');
@@ -69,7 +69,7 @@
             $('#stat-broadcasts').text(data.summary.total_broadcasts);
             let sHtml = '';
             data.speaker_details.forEach(s => { sHtml += `<tr><td>${s.name}</td><td>${s.ip}</td><td><span class="badge bg-${s.status=='Active'?'success':'danger'}">${s.status}</span></td></tr>`; });
-            $('#speakerTableBody').html(sHtml || '<tr><td colspan="3" class="text-center">No Speakers Found</td></tr>');
+            $('#speakerTableBody').html(sHtml || '<tr><td colspan="3" class="text-center">No AND Speakers Identified</td></tr>');
             updateCharts(data);
             $('#syncBtn').prop('disabled', false).text('Sync All Data');
         });

@@ -6,6 +6,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from collections import Counter
 
 app = Flask(__name__)
+# Configure ProxyFix for the /informacast/ sub-path on galacticbacon
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 
 # --- CONFIGURATION ---
@@ -14,33 +15,50 @@ BASE_URL = "https://api.icmobile.singlewire.com/api/v1"
 
 class FusionClient:
     def __init__(self, token):
-        self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        self.headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
 
     def fetch_all(self, endpoint):
         """Recursively follows the full URL provided in the 'next' field."""
         all_items = []
-        # Initial request
-        url = f"{BASE_URL}/{endpoint}?limit=100"
+        # We start with the base endpoint
+        current_url = f"{BASE_URL}/{endpoint}?limit=100"
         
-        while url:
+        while current_url:
             try:
-                print(f">>> DEBUG: Fetching: {url}", file=sys.stderr)
-                response = requests.get(url, headers=self.headers, timeout=30)
+                # Log exactly what we are about to call
+                print(f">>> DEBUG: Sending Request To: {current_url}", file=sys.stderr)
+                
+                response = requests.get(current_url, headers=self.headers, timeout=30)
                 response.raise_for_status()
                 payload = response.json()
                 
+                # Add current batch to list
                 batch = payload.get('data', [])
                 all_items.extend(batch)
                 
-                # The 'next' field contains the COMPLETE URL for the next page
-                url = payload.get('next') 
-                print(f">>> DEBUG: Batch Size: {len(batch)}. Total: {len(all_items)}", file=sys.stderr)
+                # Informacast returns a FULL URL in the 'next' field for the next page
+                # We update current_url to this value. If it's None, the loop ends.
+                current_url = payload.get('next')
+                
+                print(f">>> DEBUG: Batch Size: {len(batch)}. Total So Far: {len(all_items)}", file=sys.stderr)
+                if current_url:
+                    print(f">>> DEBUG: Next Link Found: {current_url}", file=sys.stderr)
+                else:
+                    print(f">>> DEBUG: No more pages found.", file=sys.stderr)
+                    
             except Exception as e:
                 print(f">>> ERROR: Pagination failed: {e}", file=sys.stderr)
-                break
+                # Break the loop on error so we at least return what we have
+                current_url = None
+                
         return all_items
 
 client = FusionClient(FUSION_API_TOKEN)
+
+# --- ROUTES ---
 
 @app.route('/')
 def index():
@@ -48,6 +66,7 @@ def index():
 
 @app.route('/api/analytics')
 def api_analytics():
+    # Fetch ALL pages for both devices and notifications
     devices = client.fetch_all("devices")
     notifications = client.fetch_all("notifications")
     
@@ -67,7 +86,7 @@ def api_analytics():
         
         models.append(model_name)
         
-        # Identification Logic for your 78 AND IP Speakers
+        # Filter for your 78 IP Speakers
         if any(term in model_name.upper() for term in ['SPEAKER', 'AND', 'ADVANCED']) or \
            any(term in desc for term in ['SPEAKER', 'AND']):
             speaker_details.append({
