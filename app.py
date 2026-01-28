@@ -2,6 +2,7 @@ import os
 import requests
 import sys
 import time
+from datetime import datetime
 from flask import Flask, render_template, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
 from collections import Counter
@@ -9,8 +10,14 @@ from collections import Counter
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 
-# Global status tracker for the UI
-sync_status = {"active": False, "endpoint": "", "offset": 0, "count": 0}
+# Global status tracker
+sync_status = {
+    "active": False, 
+    "endpoint": "", 
+    "offset": 0, 
+    "count": 0, 
+    "last_success": "Never"
+}
 
 # --- CONFIGURATION ---
 FUSION_API_TOKEN = os.getenv('FUSION_API_TOKEN', 'FHIXRHKMSII6RPKVNXX5C733N5KRB4MQJSJBD2F5KUCWJYHHJKI4PJ4UZRUIQZGDDJPK7U7ACTMLNSHK2VHSZUFCFARTYFKDQTMQEQA=')
@@ -47,19 +54,21 @@ class FusionClient:
                 all_items.extend(batch)
                 current_offset += len(batch)
                 
-                # Update status for the UI progress bar
                 sync_status["offset"] = current_offset
                 sync_status["count"] = len(all_items)
                 
-                if len(batch) < limit or len(all_items) > 7000:
+                # If batch < 100, we hit the end. 
+                # Safety cap raised to 8000 for your 4k+ notifiers.
+                if len(batch) < limit or len(all_items) > 8000:
                     break
                 
-                time.sleep(0.1)
+                time.sleep(0.05) # Fast but safe
             except Exception as e:
                 print(f">>> ERROR: {e}", file=sys.stderr)
                 break
         
         sync_status["active"] = False
+        sync_status["last_success"] = datetime.now().strftime("%I:%M:%S %p")
         return all_items
 
 client = FusionClient(FUSION_API_TOKEN)
