@@ -17,17 +17,14 @@ class FusionClient:
         self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     def fetch_all(self, endpoint):
+        """Recursively follows the full URL provided in the 'next' field."""
         all_items = []
+        # Initial request
         url = f"{BASE_URL}/{endpoint}?limit=100"
-        page_count = 0
-        
-        print(f">>> STARTING FETCH FOR: {endpoint}", file=sys.stderr)
         
         while url:
             try:
-                page_count += 1
-                print(f">>> DEBUG: Fetching Page {page_count} - URL: {url}", file=sys.stderr)
-                
+                print(f">>> DEBUG: Fetching: {url}", file=sys.stderr)
                 response = requests.get(url, headers=self.headers, timeout=30)
                 response.raise_for_status()
                 payload = response.json()
@@ -35,20 +32,12 @@ class FusionClient:
                 batch = payload.get('data', [])
                 all_items.extend(batch)
                 
-                print(f">>> DEBUG: Received {len(batch)} items. Current Total: {len(all_items)}", file=sys.stderr)
-                
-                # Capture the 'next' URL
-                url = payload.get('next')
-                if url:
-                    print(f">>> DEBUG: Found next page link. Continuing...", file=sys.stderr)
-                else:
-                    print(f">>> DEBUG: No 'next' link found. Loop ends.", file=sys.stderr)
-                    
+                # The 'next' field contains the COMPLETE URL for the next page
+                url = payload.get('next') 
+                print(f">>> DEBUG: Batch Size: {len(batch)}. Total: {len(all_items)}", file=sys.stderr)
             except Exception as e:
-                print(f">>> ERROR: Pagination failed on Page {page_count}: {e}", file=sys.stderr)
+                print(f">>> ERROR: Pagination failed: {e}", file=sys.stderr)
                 break
-        
-        print(f">>> COMPLETED FETCH. Final count for {endpoint}: {len(all_items)}", file=sys.stderr)
         return all_items
 
 client = FusionClient(FUSION_API_TOKEN)
@@ -78,7 +67,7 @@ def api_analytics():
         
         models.append(model_name)
         
-        # Identification Logic specifically for your AND IP Speakers
+        # Identification Logic for your 78 AND IP Speakers
         if any(term in model_name.upper() for term in ['SPEAKER', 'AND', 'ADVANCED']) or \
            any(term in desc for term in ['SPEAKER', 'AND']):
             speaker_details.append({

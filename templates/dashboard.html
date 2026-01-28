@@ -7,21 +7,16 @@
     <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background: #f8f9fa; font-family: 'Inter', sans-serif; }
+        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
         .stat-card { border: none; border-radius: 12px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        /* PREVENT GROWING CHART BUG */
-        .chart-lock-wrapper { position: relative; height: 230px; width: 100%; overflow: hidden; }
+        .chart-lock { position: relative; height: 230px; width: 100%; overflow: hidden; }
         .card { border-radius: 12px; border: none; }
     </style>
 </head>
 <body class="p-4">
-
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h2 fw-bold text-dark">📢 InformaCast Fusion Command</h1>
-            <p id="lastSyncTime" class="text-muted mb-0">Synchronizing global dataset...</p>
-        </div>
+        <h1 class="h2 fw-bold text-dark">📢 InformaCast Fusion Dashboard</h1>
         <button id="syncBtn" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="refreshData()">Sync All Data</button>
     </div>
 
@@ -33,9 +28,9 @@
     </div>
 
     <div class="row mb-4">
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3">Infrastructure Mix</h6><div class="chart-lock-wrapper"><canvas id="deviceChart"></canvas></div></div></div>
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3">Broadcast Volume</h6><div class="chart-lock-wrapper"><canvas id="trendChart"></canvas></div></div></div>
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3">Endpoint Health</h6><div class="chart-lock-wrapper"><canvas id="healthChart"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3 text-center">Infrastructure</h6><div class="chart-lock"><canvas id="deviceChart"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3 text-center">Broadcast Volume</h6><div class="chart-lock"><canvas id="trendChart"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3 text-center">Health Status</h6><div class="chart-lock"><canvas id="healthChart"></canvas></div></div></div>
     </div>
 
     <div class="card shadow-sm mb-4">
@@ -43,7 +38,7 @@
         <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
             <table class="table table-sm table-striped mb-0">
                 <thead class="bg-light sticky-top"><tr><th>Speaker Name</th><th>IP Address</th><th>Status</th></tr></thead>
-                <tbody id="speakerTableBody"><tr><td colspan="3" class="text-center p-4">Syncing speaker list...</td></tr></tbody>
+                <tbody id="speakerTableBody"><tr><td colspan="3" class="text-center p-4">Syncing inventory...</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -55,47 +50,32 @@
 <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
-
 <script>
     let charts = { device: null, trend: null, health: null };
-
     function updateCharts(data) {
         Object.values(charts).forEach(c => { if(c) c.destroy(); });
         const opt = { maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } } };
-
         charts.device = new Chart(document.getElementById('deviceChart'), { type: 'doughnut', data: { labels: Object.keys(data.device_models), datasets: [{ data: Object.values(data.device_models), backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b'] }] }, options: opt });
         charts.health = new Chart(document.getElementById('healthChart'), { type: 'pie', data: { labels: ['Online', 'Defunct'], datasets: [{ data: [data.summary.online, data.summary.defunct], backgroundColor: ['#1cc88a', '#e74a3b'] }] }, options: opt });
-        
-        const sortedDates = Object.keys(data.activity_trend).sort();
-        charts.trend = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: sortedDates, datasets: [{ label: 'Messages', data: sortedDates.map(d => data.activity_trend[d]), borderColor: '#4e73df', tension: 0.3 }] }, options: opt });
+        const dates = Object.keys(data.activity_trend).sort();
+        charts.trend = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: dates, datasets: [{ label: 'Volume', data: dates.map(d => data.activity_trend[d]), borderColor: '#4e73df', tension: 0.3 }] }, options: opt });
     }
-
     function refreshData() {
-        $('#syncBtn').prop('disabled', true).text('Syncing Pages...');
+        $('#syncBtn').prop('disabled', true).text('Syncing...');
         $.get('api/analytics', function(data) {
             $('#stat-total').text(data.summary.total_devices);
             $('#stat-online').text(data.summary.online);
             $('#stat-speakers').text(data.summary.speakers);
             $('#stat-broadcasts').text(data.summary.total_broadcasts);
-            $('#lastSyncTime').text('Last Sync: ' + new Date().toLocaleTimeString() + ' (' + data.summary.total_devices + ' devices)');
-            
-            let speakerHtml = '';
-            data.speaker_details.forEach(s => {
-                let badge = s.status === 'Active' ? 'success' : 'danger';
-                speakerHtml += `<tr><td>${s.name}</td><td>${s.ip}</td><td><span class="badge bg-${badge}">${s.status}</span></td></tr>`;
-            });
-            $('#speakerTableBody').html(speakerHtml || '<tr><td colspan="3" class="text-center">No Speakers Identified</td></tr>');
-
+            let sHtml = '';
+            data.speaker_details.forEach(s => { sHtml += `<tr><td>${s.name}</td><td>${s.ip}</td><td><span class="badge bg-${s.status=='Active'?'success':'danger'}">${s.status}</span></td></tr>`; });
+            $('#speakerTableBody').html(sHtml || '<tr><td colspan="3" class="text-center">No Speakers Found</td></tr>');
             updateCharts(data);
             $('#syncBtn').prop('disabled', false).text('Sync All Data');
         });
     }
-
     $(document).ready(function() {
-        $('#deviceTable').DataTable({ "ajax": "api/devices", "pageLength": 15, "columns": [
-            { "data": "name" }, { "data": "model" }, { "data": "ip" }, { "data": "mac" },
-            { "data": "status", "render": s => `<span class="badge ${s=='Active'?'bg-success':'bg-danger'}">${s}</span>` }
-        ]});
+        $('#deviceTable').DataTable({ "ajax": "api/devices", "pageLength": 15, "columns": [{ "data": "name" }, { "data": "model" }, { "data": "ip" }, { "data": "mac" }, { "data": "status", "render": s => `<span class="badge ${s=='Active'?'bg-success':'bg-danger'}">${s}</span>` }] });
         refreshData();
     });
 </script>
