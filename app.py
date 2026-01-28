@@ -1,25 +1,45 @@
+import os
+import requests
+import sys
+import time
+import threading
+from datetime import datetime
+from flask import Flask, render_template, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
+
+# Persistent state
+state = {
+    "is_syncing": False,
+    "offset": 0,
+    "speakers_found": 0,
+    "last_sync": "Never",
+    "speakers": []
+}
+state_lock = threading.Lock()
+
+FUSION_API_TOKEN = os.getenv('FUSION_API_TOKEN', 'FHIXRHKMSII6RPKVNXX5C733N5KRB4MQJSJBD2F5KUCWJYHHJKI4PJ4UZRUIQZGDDJPK7U7ACTMLNSHK2VHSZUFCFARTYFKDQTMQEQA=')
+BASE_URL = "https://api.icmobile.singlewire.com/api/v1"
+
 def filter_device(device):
-    """Broadened filter to ensure we catch all 78 AND speakers."""
+    """Refined filter for Advanced Network Devices (AND)."""
     attrs = device.get('attributes', {})
     model = str(attrs.get('InformaCastDeviceType', '')).upper()
     desc = str(device.get('description', '')).upper()
     
-    # Still strictly exclude Cisco Phones
-    if "CISCO" in model or "SEP" in desc:
+    # Exclude Cisco and Notifiers
+    if any(x in model for x in ["CISCO", "DESKTOP"]):
         return False
         
-    # AND hardware often identifies as 'Advanced', 'IPSpeaker', 
-    # or simply contains 'AND' in the description.
-    is_speaker = any(term in model for term in ["ADVANCED", "IPSPEAKER", "SPEAKER"]) or \
-                 any(term in desc for term in ["AND ", "SPEAKER", "CLOCK"])
-                 
+    # Standard AND Hardware labels
+    is_speaker = any(x in model for x in ["ADVANCED", "IPSPEAKER"]) or "AND " in desc
     if is_speaker:
-        print(f">>> MATCH FOUND: {desc} | Model: {model}", file=sys.stderr)
-        
+        print(f">>> MATCH: {desc}", file=sys.stderr)
     return is_speaker
 
 def run_sync():
-    """Background task with increased cap and improved exit logic."""
     global state
     with state_lock:
         state.update({"is_syncing": True, "offset": 0, "speakers_found": 0, "speakers": []})
@@ -36,7 +56,6 @@ def run_sync():
                 time.sleep(5); continue
             resp.raise_for_status()
             data = resp.json().get('data', [])
-            
             if not data: break
 
             for d in data:
@@ -57,12 +76,28 @@ def run_sync():
                 state["speakers_found"] = len(local_speakers)
                 state["speakers"] = local_speakers
 
-            # Raised safety cap to 12,000 just in case
-            if local_offset >= 12000: break
-            time.sleep(0.02)
+            # Safety cap for your 4,133 notifiers + gear
+            if len(data) < 100 or local_offset >= 12000: break
+            time.sleep(0.01)
         except Exception as e:
             print(f">>> ERROR: {e}", file=sys.stderr); break
 
     with state_lock:
         state["is_syncing"] = False
         state["last_sync"] = datetime.now().strftime("%I:%M:%S %p")
+
+@app.route('/')
+def index(): return render_template('dashboard.html')
+
+@app.route('/api/status')
+def get_status():
+    with state_lock: return jsonify(state)
+
+@app.route('/api/trigger_sync')
+def trigger():
+    if not state["is_syncing"]:
+        threading.Thread(target=run_sync).start()
+    return jsonify({"status": "ok"})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5082)
