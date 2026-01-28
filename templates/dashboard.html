@@ -2,20 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>InformaCast Fusion Dashboard</title>
+    <title>InformaCast Command Center</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+        body { background: #f8f9fa; font-family: 'Inter', sans-serif; }
         .stat-card { border: none; border-radius: 12px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .chart-lock { position: relative; height: 230px; width: 100%; overflow: hidden; }
+        .card { border-radius: 12px; border: none; }
     </style>
 </head>
 <body class="p-4">
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h2 fw-bold text-dark">📢 InformaCast Fusion Dashboard</h1>
+        <h1 class="h2 fw-bold text-dark">📢 InformaCast Dashboard</h1>
         <button id="syncBtn" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="refreshData()">Sync All Data</button>
     </div>
 
@@ -28,13 +29,13 @@
     </div>
 
     <div class="row mb-4">
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>Infrastructure</h6><div class="chart-lock"><canvas id="deviceChart"></canvas></div></div></div>
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>Activity Trend</h6><div class="chart-lock"><canvas id="trendChart"></canvas></div></div></div>
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>Endpoint Health</h6><div class="chart-lock"><canvas id="healthChart"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>System Infrastructure</h6><div class="chart-lock"><canvas id="deviceChart"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>Broadcast History</h6><div class="chart-lock"><canvas id="trendChart"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>Device Health</h6><div class="chart-lock"><canvas id="healthChart"></canvas></div></div></div>
     </div>
 
     <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white py-3 sticky-top"><h6 class="mb-0 fw-bold">AND IP Speaker Detailed Status</h6></div>
+        <div class="card-header bg-white py-3 sticky-top"><h6 class="mb-0 fw-bold">IP Speaker Status Tracking</h6></div>
         <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
             <table class="table table-sm table-striped mb-0">
                 <thead class="bg-light sticky-top"><tr><th>Speaker Name</th><th>IP Address</th><th>Status</th></tr></thead>
@@ -43,7 +44,7 @@
         </div>
     </div>
 
-    <div class="card shadow-sm mb-4"><div class="card-header bg-white py-3"><h5>Full Inventory List</h5></div>
+    <div class="card shadow-sm mb-4"><div class="card-header bg-white py-3"><h5>Full System Inventory</h5></div>
     <div class="card-body"><table id="deviceTable" class="table table-hover w-100"><thead><tr><th>Name</th><th>Model</th><th>IP</th><th>MAC</th><th>Status</th></tr></thead></table></div></div>
 </div>
 
@@ -58,9 +59,10 @@
         charts.device = new Chart(document.getElementById('deviceChart'), { type: 'doughnut', data: { labels: Object.keys(data.device_models), datasets: [{ data: Object.values(data.device_models), backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b'] }] }, options: opt });
         charts.health = new Chart(document.getElementById('healthChart'), { type: 'pie', data: { labels: ['Online', 'Defunct'], datasets: [{ data: [data.summary.online, data.summary.defunct], backgroundColor: ['#1cc88a', '#e74a3b'] }] }, options: opt });
         const dates = Object.keys(data.activity_trend).sort();
-        charts.trend = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: dates, datasets: [{ label: 'Volume', data: dates.map(d => data.activity_trend[d]), borderColor: '#4e73df', tension: 0.3 }] }, options: opt });
+        charts.trend = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: dates, datasets: [{ label: 'Broadcasting', data: dates.map(d => data.activity_trend[d]), borderColor: '#4e73df', tension: 0.3 }] }, options: opt });
     }
     function refreshData() {
+        $('#syncBtn').prop('disabled', true).text('Processing Pages...');
         $.get('api/analytics', function(data) {
             $('#stat-total').text(data.summary.total_devices);
             $('#stat-online').text(data.summary.online);
@@ -69,8 +71,9 @@
             $('#stat-notifiers').text(data.device_models['DesktopNotifier'] || 0);
             let sHtml = '';
             data.speaker_details.forEach(s => { sHtml += `<tr><td>${s.name}</td><td>${s.ip}</td><td><span class="badge bg-${s.status=='Active'?'success':'danger'}">${s.status}</span></td></tr>`; });
-            $('#speakerTableBody').html(sHtml || '<tr><td colspan="3" class="text-center">No Speakers Found</td></tr>');
+            $('#speakerTableBody').html(sHtml || '<tr><td colspan="3" class="text-center">No Speakers Identified</td></tr>');
             updateCharts(data);
+            $('#syncBtn').prop('disabled', false).text('Sync All Data');
         });
     }
     $(document).ready(function() {

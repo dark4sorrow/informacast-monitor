@@ -18,20 +18,21 @@ class FusionClient:
         self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     def fetch_all(self, endpoint):
-        """Specifically updates the next_offset to move past page 1."""
+        """Advances current_offset properly to prevent infinite loops."""
         all_items = []
         limit = 100
+        # Initialize as string "0" for the first call
         current_offset = "0"
         
         while current_offset is not None:
             url = f"{BASE_URL}/{endpoint}?limit={limit}&offset={current_offset}"
             try:
-                print(f">>> DEBUG: Fetching {endpoint} at offset {current_offset}", file=sys.stderr)
-                response = requests.get(url, headers=self.headers, timeout=15)
+                print(f">>> DEBUG: Calling API - {url}", file=sys.stderr)
+                response = requests.get(url, headers=self.headers, timeout=20)
                 
                 if response.status_code == 429:
-                    print(">>> Rate limited, waiting...", file=sys.stderr)
-                    time.sleep(5)
+                    print(">>> Rate Limit Hit. Waiting 10s...", file=sys.stderr)
+                    time.sleep(10)
                     continue
                 
                 response.raise_for_status()
@@ -43,12 +44,15 @@ class FusionClient:
                     
                 all_items.extend(batch)
                 
-                # THE FIX: Assign the 'next' value to current_offset for the next loop iteration
+                # THE FIX: We must update current_offset with the 'next' value from the response
+                # to actually move to page 2, 3, etc.
                 current_offset = payload.get('next')
                 
-                # Hard limit to prevent runaway loops if the API behaves unexpectedly
-                if len(all_items) > 8000:
-                    print(">>> Safety cap reached.", file=sys.stderr)
+                print(f">>> DEBUG: Captured {len(batch)} items. Total: {len(all_items)}", file=sys.stderr)
+                
+                # Safety break to prevent runaway if 'next' never becomes null
+                if len(all_items) > 6000:
+                    print(">>> DEBUG: Safety limit reached.", file=sys.stderr)
                     break
                     
             except Exception as e:
@@ -83,7 +87,7 @@ def api_analytics():
         
         models.append(model_name)
         
-        # Filter for IP Speakers (AND)
+        # Identify IP Speakers (AND)
         desc = (d.get('description') or '').upper()
         if any(x in model_name.upper() for x in ['SPEAKER', 'AND']) or 'AND ' in desc:
             speaker_details.append({
