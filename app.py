@@ -18,18 +18,19 @@ class FusionClient:
         self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     def fetch_all(self, endpoint):
-        """Properly increments offset based on API response to prevent infinite loops."""
+        """Specifically updates the next_offset to move past page 1."""
         all_items = []
         limit = 100
-        next_offset = "0"
+        current_offset = "0"
         
-        while next_offset:
-            url = f"{BASE_URL}/{endpoint}?limit={limit}&offset={next_offset}"
+        while current_offset is not None:
+            url = f"{BASE_URL}/{endpoint}?limit={limit}&offset={current_offset}"
             try:
-                print(f">>> DEBUG: Fetching {endpoint} at offset {next_offset}", file=sys.stderr)
+                print(f">>> DEBUG: Fetching {endpoint} at offset {current_offset}", file=sys.stderr)
                 response = requests.get(url, headers=self.headers, timeout=15)
                 
                 if response.status_code == 429:
+                    print(">>> Rate limited, waiting...", file=sys.stderr)
                     time.sleep(5)
                     continue
                 
@@ -42,12 +43,12 @@ class FusionClient:
                     
                 all_items.extend(batch)
                 
-                # Singlewire returns the NEXT offset as a string (e.g., "100", "200")
-                # When we reach the end, 'next' becomes null/None
-                next_offset = payload.get('next')
+                # THE FIX: Assign the 'next' value to current_offset for the next loop iteration
+                current_offset = payload.get('next')
                 
-                # Safety break to prevent 429s if something goes wrong
-                if len(all_items) > 10000:
+                # Hard limit to prevent runaway loops if the API behaves unexpectedly
+                if len(all_items) > 8000:
+                    print(">>> Safety cap reached.", file=sys.stderr)
                     break
                     
             except Exception as e:
@@ -82,7 +83,7 @@ def api_analytics():
         
         models.append(model_name)
         
-        # FILTER: Identify the 78 IP Speakers
+        # Filter for IP Speakers (AND)
         desc = (d.get('description') or '').upper()
         if any(x in model_name.upper() for x in ['SPEAKER', 'AND']) or 'AND ' in desc:
             speaker_details.append({
