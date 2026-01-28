@@ -6,7 +6,6 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from collections import Counter
 
 app = Flask(__name__)
-# Configure ProxyFix for the /informacast/ sub-path on galacticbacon
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 
 # --- CONFIGURATION ---
@@ -15,50 +14,43 @@ BASE_URL = "https://api.icmobile.singlewire.com/api/v1"
 
 class FusionClient:
     def __init__(self, token):
-        self.headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
+        self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     def fetch_all(self, endpoint):
-        """Recursively follows the full URL provided in the 'next' field."""
         all_items = []
-        # We start with the base endpoint
         current_url = f"{BASE_URL}/{endpoint}?limit=100"
         
         while current_url:
             try:
-                # Log exactly what we are about to call
-                print(f">>> DEBUG: Sending Request To: {current_url}", file=sys.stderr)
-                
+                print(f">>> DEBUG: Requesting: {current_url}", file=sys.stderr)
                 response = requests.get(current_url, headers=self.headers, timeout=30)
                 response.raise_for_status()
                 payload = response.json()
                 
-                # Add current batch to list
+                # Pull the data batch
                 batch = payload.get('data', [])
                 all_items.extend(batch)
                 
-                # Informacast returns a FULL URL in the 'next' field for the next page
-                # We update current_url to this value. If it's None, the loop ends.
-                current_url = payload.get('next')
+                # CORRECT PATH: Singlewire usually puts pagination in a 'paging' or 'links' object
+                # If 'next' is at the root and returning '100', it's the wrong key.
+                # We will check both 'next' and 'paging.next' to be safe.
+                paging = payload.get('paging', {})
+                next_link = paging.get('next') or payload.get('next')
                 
-                print(f">>> DEBUG: Batch Size: {len(batch)}. Total So Far: {len(all_items)}", file=sys.stderr)
-                if current_url:
-                    print(f">>> DEBUG: Next Link Found: {current_url}", file=sys.stderr)
+                # Check if the captured 'next' is a valid URL or just a number
+                if next_link and isinstance(next_link, str) and next_link.startswith('http'):
+                    current_url = next_link
                 else:
-                    print(f">>> DEBUG: No more pages found.", file=sys.stderr)
-                    
+                    current_url = None
+                
+                print(f">>> DEBUG: Batch: {len(batch)}. Total: {len(all_items)}", file=sys.stderr)
             except Exception as e:
-                print(f">>> ERROR: Pagination failed: {e}", file=sys.stderr)
-                # Break the loop on error so we at least return what we have
+                print(f">>> ERROR: {e}", file=sys.stderr)
                 current_url = None
                 
         return all_items
 
 client = FusionClient(FUSION_API_TOKEN)
-
-# --- ROUTES ---
 
 @app.route('/')
 def index():
@@ -66,7 +58,6 @@ def index():
 
 @app.route('/api/analytics')
 def api_analytics():
-    # Fetch ALL pages for both devices and notifications
     devices = client.fetch_all("devices")
     notifications = client.fetch_all("notifications")
     
@@ -86,7 +77,6 @@ def api_analytics():
         
         models.append(model_name)
         
-        # Filter for your 78 IP Speakers
         if any(term in model_name.upper() for term in ['SPEAKER', 'AND', 'ADVANCED']) or \
            any(term in desc for term in ['SPEAKER', 'AND']):
             speaker_details.append({
@@ -100,11 +90,8 @@ def api_analytics():
         'activity_trend': dict(Counter([n.get('createdAt')[:10] for n in notifications if n.get('createdAt')])),
         'speaker_details': speaker_details,
         'summary': {
-            'total_devices': len(devices),
-            'online': active,
-            'defunct': defunct,
-            'speakers': len(speaker_details),
-            'total_broadcasts': len(notifications)
+            'total_devices': len(devices), 'online': active, 'defunct': defunct,
+            'speakers': len(speaker_details), 'total_broadcasts': len(notifications)
         }
     })
 
