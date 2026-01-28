@@ -18,21 +18,19 @@ class FusionClient:
         self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     def fetch_all(self, endpoint):
-        """Correctly increments the offset and respects API rate limits."""
+        """Properly increments offset based on API response to prevent infinite loops."""
         all_items = []
         limit = 100
-        offset = 0
-        safety_gate = 0
+        next_offset = "0"
         
-        while safety_gate < 100:  # Hard cap to prevent infinite loops
-            url = f"{BASE_URL}/{endpoint}?limit={limit}&offset={offset}"
+        while next_offset:
+            url = f"{BASE_URL}/{endpoint}?limit={limit}&offset={next_offset}"
             try:
-                print(f">>> DEBUG: Fetching {endpoint} - Offset {offset}", file=sys.stderr)
+                print(f">>> DEBUG: Fetching {endpoint} at offset {next_offset}", file=sys.stderr)
                 response = requests.get(url, headers=self.headers, timeout=15)
                 
                 if response.status_code == 429:
-                    print(">>> WARNING: Rate limited. Sleeping 10s...", file=sys.stderr)
-                    time.sleep(10)
+                    time.sleep(5)
                     continue
                 
                 response.raise_for_status()
@@ -44,22 +42,18 @@ class FusionClient:
                     
                 all_items.extend(batch)
                 
-                # INCREMENT: Move offset forward by the number of items received
-                offset += len(batch)
-                safety_gate += 1
+                # Singlewire returns the NEXT offset as a string (e.g., "100", "200")
+                # When we reach the end, 'next' becomes null/None
+                next_offset = payload.get('next')
                 
-                # If we received fewer than the limit, we've reached the end
-                if len(batch) < limit:
+                # Safety break to prevent 429s if something goes wrong
+                if len(all_items) > 10000:
                     break
-                
-                # Small delay to prevent hammering the API
-                time.sleep(0.1)
                     
             except Exception as e:
-                print(f">>> ERROR: {endpoint} fetch failed at offset {offset}: {e}", file=sys.stderr)
+                print(f">>> ERROR: {e}", file=sys.stderr)
                 break
                 
-        print(f">>> SUCCESS: Retrieved {len(all_items)} total {endpoint}.", file=sys.stderr)
         return all_items
 
 client = FusionClient(FUSION_API_TOKEN)
@@ -88,7 +82,7 @@ def api_analytics():
         
         models.append(model_name)
         
-        # Identify your 78 IP Speakers
+        # FILTER: Identify the 78 IP Speakers
         desc = (d.get('description') or '').upper()
         if any(x in model_name.upper() for x in ['SPEAKER', 'AND']) or 'AND ' in desc:
             speaker_details.append({

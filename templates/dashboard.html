@@ -10,7 +10,6 @@
         body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
         .stat-card { border: none; border-radius: 12px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .chart-lock { position: relative; height: 230px; width: 100%; overflow: hidden; }
-        .card { border-radius: 12px; border: none; }
     </style>
 </head>
 <body class="p-4">
@@ -20,17 +19,18 @@
         <button id="syncBtn" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="refreshData()">Sync All Data</button>
     </div>
 
-    <div class="row mb-4">
-        <div class="col-md-3"><div class="card stat-card p-4 text-center"><small class="text-muted fw-bold">TOTAL ENDPOINTS</small><h2 id="stat-total" class="fw-bold mb-0">-</h2></div></div>
-        <div class="col-md-3"><div class="card stat-card p-4 text-center border-start border-success border-5"><small class="text-muted fw-bold text-success">ACTIVE / ONLINE</small><h2 id="stat-online" class="text-success fw-bold mb-0">-</h2></div></div>
-        <div class="col-md-3"><div class="card stat-card p-4 text-center border-start border-primary border-5"><small class="text-muted fw-bold text-primary">AND IP SPEAKERS</small><h2 id="stat-speakers" class="text-primary fw-bold mb-0">-</h2></div></div>
-        <div class="col-md-3"><div class="card stat-card p-4 text-center border-start border-warning border-5"><small class="text-muted fw-bold text-warning">RECENT BROADCASTS</small><h2 id="stat-broadcasts" class="text-warning fw-bold mb-0">-</h2></div></div>
+    <div class="row mb-4 text-center">
+        <div class="col-md-2"><div class="card stat-card p-3"><small class="text-muted fw-bold">TOTAL</small><h3 id="stat-total" class="fw-bold mb-0">-</h3></div></div>
+        <div class="col-md-2"><div class="card stat-card p-3 border-start border-success border-5"><small class="text-muted fw-bold text-success">ONLINE</small><h3 id="stat-online" class="text-success fw-bold mb-0">-</h3></div></div>
+        <div class="col-md-3"><div class="card stat-card p-3 border-start border-primary border-5"><small class="text-muted fw-bold text-primary">AND IP SPEAKERS (78)</small><h3 id="stat-speakers" class="text-primary fw-bold mb-0">-</h3></div></div>
+        <div class="col-md-3"><div class="card stat-card p-3 border-start border-info border-5"><small class="text-muted fw-bold text-info">DESKTOP NOTIFIERS</small><h3 id="stat-notifiers" class="text-info fw-bold mb-0">-</h3></div></div>
+        <div class="col-md-2"><div class="card stat-card p-3 border-start border-warning border-5"><small class="text-muted fw-bold text-warning">BROADCASTS</small><h3 id="stat-broadcasts" class="text-warning fw-bold mb-0">-</h3></div></div>
     </div>
 
     <div class="row mb-4">
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3 text-center">Infrastructure Mix</h6><div class="chart-lock"><canvas id="deviceChart"></canvas></div></div></div>
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3 text-center">Broadcast Volume</h6><div class="chart-lock"><canvas id="trendChart"></canvas></div></div></div>
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6 class="fw-bold text-muted mb-3 text-center">Endpoint Health</h6><div class="chart-lock"><canvas id="healthChart"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>Infrastructure</h6><div class="chart-lock"><canvas id="deviceChart"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>Activity Trend</h6><div class="chart-lock"><canvas id="trendChart"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>Endpoint Health</h6><div class="chart-lock"><canvas id="healthChart"></canvas></div></div></div>
     </div>
 
     <div class="card shadow-sm mb-4">
@@ -43,7 +43,7 @@
         </div>
     </div>
 
-    <div class="card shadow-sm mb-4"><div class="card-header bg-white py-3"><h5 class="mb-0 fw-bold">Full Global Inventory</h5></div>
+    <div class="card shadow-sm mb-4"><div class="card-header bg-white py-3"><h5>Full Inventory List</h5></div>
     <div class="card-body"><table id="deviceTable" class="table table-hover w-100"><thead><tr><th>Name</th><th>Model</th><th>IP</th><th>MAC</th><th>Status</th></tr></thead></table></div></div>
 </div>
 
@@ -66,6 +66,7 @@
             $('#stat-online').text(data.summary.online);
             $('#stat-speakers').text(data.summary.speakers);
             $('#stat-broadcasts').text(data.summary.total_broadcasts);
+            $('#stat-notifiers').text(data.device_models['DesktopNotifier'] || 0);
             let sHtml = '';
             data.speaker_details.forEach(s => { sHtml += `<tr><td>${s.name}</td><td>${s.ip}</td><td><span class="badge bg-${s.status=='Active'?'success':'danger'}">${s.status}</span></td></tr>`; });
             $('#speakerTableBody').html(sHtml || '<tr><td colspan="3" class="text-center">No Speakers Found</td></tr>');
