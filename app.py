@@ -17,36 +17,38 @@ class FusionClient:
         self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     def fetch_all(self, endpoint):
+        """Builds URLs using the numeric offset returned by the API."""
         all_items = []
-        current_url = f"{BASE_URL}/{endpoint}?limit=100"
+        limit = 100
+        offset = 0
         
-        while current_url:
+        while True:
+            # Manually build the URL using the offset
+            url = f"{BASE_URL}/{endpoint}?limit={limit}&offset={offset}"
+            
             try:
-                print(f">>> DEBUG: Requesting: {current_url}", file=sys.stderr)
-                response = requests.get(current_url, headers=self.headers, timeout=30)
+                print(f">>> DEBUG: Fetching Offset {offset}: {url}", file=sys.stderr)
+                response = requests.get(url, headers=self.headers, timeout=30)
                 response.raise_for_status()
                 payload = response.json()
                 
-                # Pull the data batch
                 batch = payload.get('data', [])
                 all_items.extend(batch)
                 
-                # CORRECT PATH: Singlewire usually puts pagination in a 'paging' or 'links' object
-                # If 'next' is at the root and returning '100', it's the wrong key.
-                # We will check both 'next' and 'paging.next' to be safe.
-                paging = payload.get('paging', {})
-                next_link = paging.get('next') or payload.get('next')
-                
-                # Check if the captured 'next' is a valid URL or just a number
-                if next_link and isinstance(next_link, str) and next_link.startswith('http'):
-                    current_url = next_link
-                else:
-                    current_url = None
+                # Check the 'next' field from your JSON. It returns the string "100", "200", etc.
+                next_offset = payload.get('next')
                 
                 print(f">>> DEBUG: Batch: {len(batch)}. Total: {len(all_items)}", file=sys.stderr)
+                
+                if next_offset and str(next_offset).isdigit():
+                    offset = int(next_offset)
+                else:
+                    print(f">>> DEBUG: No valid next offset. Ending loop.", file=sys.stderr)
+                    break
+                    
             except Exception as e:
-                print(f">>> ERROR: {e}", file=sys.stderr)
-                current_url = None
+                print(f">>> ERROR: Pagination failed at offset {offset}: {e}", file=sys.stderr)
+                break
                 
         return all_items
 
@@ -77,6 +79,7 @@ def api_analytics():
         
         models.append(model_name)
         
+        # Filtering for your 78 AND IP Speakers
         if any(term in model_name.upper() for term in ['SPEAKER', 'AND', 'ADVANCED']) or \
            any(term in desc for term in ['SPEAKER', 'AND']):
             speaker_details.append({
@@ -90,8 +93,11 @@ def api_analytics():
         'activity_trend': dict(Counter([n.get('createdAt')[:10] for n in notifications if n.get('createdAt')])),
         'speaker_details': speaker_details,
         'summary': {
-            'total_devices': len(devices), 'online': active, 'defunct': defunct,
-            'speakers': len(speaker_details), 'total_broadcasts': len(notifications)
+            'total_devices': len(devices),
+            'online': active,
+            'defunct': defunct,
+            'speakers': len(speaker_details),
+            'total_broadcasts': len(notifications)
         }
     })
 
