@@ -2,80 +2,83 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>InformaCast Speaker Monitor</title>
+    <title>InformaCast Speaker Scan</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <style>
-        body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
-        .stat-card { border: none; border-radius: 12px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        #syncBar { background: #000; color: #fff; padding: 10px 25px; display: none; position: sticky; top: 0; z-index: 1000; }
+        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+        .stat-card { border: none; border-radius: 12px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        #syncOverlay { display: none; background: #212529; color: #fff; border-radius: 10px; padding: 15px 25px; margin-bottom: 25px; border-left: 8px solid #0d6efd; }
     </style>
 </head>
-<body>
-    <div id="syncBar" class="d-flex justify-content-between align-items-center">
-        <span><span class="spinner-grow spinner-grow-sm me-2"></span> <strong>Scanned:</strong> <span id="syncOffset">0</span> devices...</span>
-        <span><strong>Speakers Identified:</strong> <span id="syncFound" class="text-info">0</span> / 78</span>
+<body class="p-4">
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 fw-bold text-dark mb-0">🔊 IP Speaker Infrastructure</h1>
+            <small class="text-muted">Last Data Pull: <span id="lastSync">Never</span></small>
+        </div>
+        <button id="syncBtn" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="refreshData()">Deep Scan (8,000+ Devices)</button>
     </div>
 
-    <div class="container-fluid p-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+    <div id="syncOverlay" class="shadow-lg">
+        <div class="d-flex justify-content-between align-items-center">
             <div>
-                <h1 class="h3 fw-bold mb-0">🔊 IP Speaker Infrastructure</h1>
-                <small class="text-muted">Last Data Pull: <span id="lastSync">Never</span></small>
+                <span class="spinner-grow spinner-grow-sm text-primary me-3"></span>
+                <strong class="h5 mb-0">Scanning InformaCast Inventory...</strong>
             </div>
-            <button id="syncBtn" class="btn btn-dark px-4" onclick="refreshData()">Start Deep Scan</button>
-        </div>
-
-        <div class="row mb-4">
-            <div class="col-md-4"><div class="card stat-card p-4 text-center"><h6>IDENTIFIED SPEAKERS</h6><h2 id="stat-speakers" class="fw-bold text-primary">-</h2></div></div>
-            <div class="col-md-4"><div class="card stat-card p-4 text-center"><h6>ONLINE</h6><h2 id="stat-online" class="fw-bold text-success">-</h2></div></div>
-            <div class="col-md-4"><div class="card stat-card p-4 text-center"><h6>OFFLINE / DEFUNCT</h6><h2 id="stat-defunct" class="fw-bold text-danger">-</h2></div></div>
-        </div>
-
-        <div class="card shadow-sm">
-            <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold">Detailed Speaker Inventory</h6></div>
-            <div class="card-body p-0">
-                <table id="speakerTable" class="table table-hover mb-0">
-                    <thead><tr><th>Speaker Name</th><th>IP Address</th><th>Model Type</th><th>Status</th></tr></thead>
-                    <tbody id="speakerBody"></tbody>
-                </table>
+            <div class="text-end">
+                <div class="fw-bold h5 mb-0"><span id="syncOffset">0</span> / 8200 Scanned</div>
+                <small class="text-info">Speakers Found: <span id="syncFound">0</span></small>
             </div>
         </div>
     </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4"><div class="card stat-card p-4 text-center"><h6>IDENTIFIED SPEAKERS</h6><h2 id="stat-speakers" class="fw-bold text-primary">-</h2></div></div>
+        <div class="col-md-4"><div class="card stat-card p-4 text-center"><h6>ONLINE</h6><h2 id="stat-online" class="fw-bold text-success">-</h2></div></div>
+        <div class="col-md-4"><div class="card stat-card p-4 text-center"><h6>OFFLINE / DEFUNCT</h6><h2 id="stat-defunct" class="fw-bold text-danger">-</h2></div></div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white py-3 fw-bold">Detailed Speaker Inventory</div>
+        <div class="card-body p-0"><table class="table table-hover mb-0">
+            <thead><tr><th>Speaker Name</th><th>IP Address</th><th>Model</th><th>Status</th></tr></thead>
+            <tbody id="speakerBody"></tbody>
+        </table></div>
+    </div>
+</div>
 
 <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 <script>
     let statusInt = null;
 
     function refreshData() {
-        $('#syncBtn').prop('disabled', true).text('Scanning...');
-        $('#syncBar').slideDown();
+        $('#syncBtn').prop('disabled', true).text('Scan in Progress...');
+        $('#syncOverlay').fadeIn();
         
+        // Polling the /api/status endpoint every 1 second
         statusInt = setInterval(() => {
             $.get('api/status', (s) => {
                 $('#syncOffset').text(s.offset);
                 $('#syncFound').text(s.speakers_found);
                 $('#lastSync').text(s.last_success);
                 if (!s.active) {
-                    $('#syncBar').slideUp();
+                    $('#syncOverlay').fadeOut();
+                    $('#syncBtn').prop('disabled', false).text('Deep Scan (8,000+ Devices)');
                     clearInterval(statusInt);
                 }
             });
-        }, 800);
+        }, 1000);
 
         $.get('api/analytics', (data) => {
-            $('#stat-speakers').text(data.summary.speakers);
-            $('#stat-online').text(data.summary.online);
-            $('#stat-defunct').text(data.summary.defunct);
-            
+            $('#stat-speakers').text(data.speaker_details.length);
+            $('#stat-online').text(data.speaker_details.filter(s => s.status === 'Active').length);
+            $('#stat-defunct').text(data.speaker_details.filter(s => s.status === 'Defunct').length);
             let html = '';
             data.speaker_details.forEach(s => {
                 html += `<tr><td>${s.name}</td><td>${s.ip}</td><td>${s.model}</td><td><span class="badge bg-${s.status=='Active'?'success':'danger'}">${s.status}</span></td></tr>`;
             });
-            $('#speakerBody').html(html || '<tr><td colspan="4" class="text-center">No Speakers Found</td></tr>');
-            $('#syncBtn').prop('disabled', false).text('Start Deep Scan');
+            $('#speakerBody').html(html || '<tr><td colspan="4" class="text-center p-4">No Speakers Found</td></tr>');
         });
     }
 

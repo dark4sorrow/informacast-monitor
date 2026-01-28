@@ -9,7 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 
-# Status and Cache
+# Live status tracker
 sync_status = {"active": False, "offset": 0, "speakers_found": 0, "last_success": "Never"}
 speaker_cache = []
 
@@ -17,17 +17,11 @@ FUSION_API_TOKEN = os.getenv('FUSION_API_TOKEN', 'FHIXRHKMSII6RPKVNXX5C733N5KRB4
 BASE_URL = "https://api.icmobile.singlewire.com/api/v1"
 
 def is_actually_a_speaker(device):
-    """STRICT FILTER: Excludes Cisco phones and hunts for AND hardware."""
+    """STRICT FILTER: Specifically hunts for AND hardware and blocks Cisco phones."""
     attrs = device.get('attributes', {})
     model = str(attrs.get('InformaCastDeviceType', '')).upper()
     desc = str(device.get('description', '')).upper()
-    
-    # KILL CISCO PHONES IMMEDIATELY
-    if "CISCOIPPHONE" in model or "PHONE" in model:
-        return False
-    
-    # LOOK FOR ADVANCED NETWORK DEVICES (AND)
-    # Most AND speakers show up as 'AdvancedNetworkDevices' or have 'AND' in the desc
+    if "CISCOIPPHONE" in model or "PHONE" in model: return False
     return "ADVANCED" in model or "SPEAKER" in model or "AND " in desc
 
 @app.route('/')
@@ -47,7 +41,7 @@ def api_analytics():
     while True:
         url = f"{BASE_URL}/devices?limit=100&offset={current_offset}"
         try:
-            print(f">>> [PROCESS {os.getpid()}] Filtering Offset {current_offset}", file=sys.stderr)
+            print(f">>> [SCAN] Offset {current_offset}", file=sys.stderr)
             response = requests.get(url, headers={"Authorization": f"Bearer {FUSION_API_TOKEN}"}, timeout=20)
             if response.status_code == 429:
                 time.sleep(10); continue
@@ -70,25 +64,16 @@ def api_analytics():
                     seen_ids.add(device_id)
             
             current_offset += len(batch)
+            # LIVE UPDATE: UI will see this immediately
             sync_status.update({"offset": current_offset, "speakers_found": len(speaker_cache)})
             
-            # Auto-stop after your approx total count (around 5000-6000)
-            if len(batch) < 100 or current_offset > 8000: break
+            if len(batch) < 100 or current_offset > 9000: break
             time.sleep(0.05)
-            
         except Exception as e:
             print(f">>> ERROR: {e}", file=sys.stderr); break
 
     sync_status.update({"active": False, "last_success": datetime.now().strftime("%I:%M:%S %p")})
-    return jsonify({
-        'speaker_details': speaker_cache,
-        'summary': {
-            'total_scanned': current_offset,
-            'speakers': len(speaker_cache),
-            'online': sum(1 for s in speaker_cache if s['status'] == 'Active'),
-            'defunct': sum(1 for s in speaker_cache if s['status'] == 'Defunct')
-        }
-    })
+    return jsonify({'speaker_details': speaker_cache, 'summary': {'speakers': len(speaker_cache)}})
 
 @app.route('/api/devices')
 def api_devices(): return jsonify({'data': speaker_cache})
