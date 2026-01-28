@@ -10,7 +10,7 @@
         body { background: #f8f9fa; font-family: 'Inter', sans-serif; }
         .stat-card { border: none; border-radius: 12px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .chart-lock { position: relative; height: 230px; width: 100%; overflow: hidden; }
-        .card { border-radius: 12px; border: none; }
+        #syncOverlay { display: none; background: #e9ecef; border-radius: 8px; padding: 10px 20px; margin-bottom: 20px; border-left: 5px solid #0d6efd; }
     </style>
 </head>
 <body class="p-4">
@@ -18,6 +18,16 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h2 fw-bold text-dark">📢 InformaCast Dashboard</h1>
         <button id="syncBtn" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="refreshData()">Sync All Data</button>
+    </div>
+
+    <div id="syncOverlay" class="shadow-sm">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong class="text-primary">Syncing Live Data...</strong> 
+                <span id="syncDetail" class="ms-2 text-muted small">Initializing connection to Fusion API...</span>
+            </div>
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+        </div>
     </div>
 
     <div class="row mb-4 text-center">
@@ -39,7 +49,7 @@
         <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
             <table class="table table-sm table-striped mb-0">
                 <thead class="bg-light sticky-top"><tr><th>Speaker Name</th><th>IP Address</th><th>Status</th></tr></thead>
-                <tbody id="speakerTableBody"><tr><td colspan="3" class="text-center p-4">Syncing inventory...</td></tr></tbody>
+                <tbody id="speakerTableBody"><tr><td colspan="3" class="text-center p-4">Waiting for sync...</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -53,6 +63,8 @@
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 <script>
     let charts = { device: null, trend: null, health: null };
+    let statusInterval = null;
+
     function updateCharts(data) {
         Object.values(charts).forEach(c => { if(c) c.destroy(); });
         const opt = { maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } } };
@@ -61,8 +73,22 @@
         const dates = Object.keys(data.activity_trend).sort();
         charts.trend = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: dates, datasets: [{ label: 'Broadcasting', data: dates.map(d => data.activity_trend[d]), borderColor: '#4e73df', tension: 0.3 }] }, options: opt });
     }
+
+    function checkSyncStatus() {
+        $.get('api/status', function(s) {
+            if(s.active) {
+                $('#syncOverlay').fadeIn();
+                $('#syncDetail').text(`Fetching ${s.endpoint}... Current Offset: ${s.offset} | Total Downloaded: ${s.count}`);
+            } else {
+                $('#syncOverlay').fadeOut();
+                clearInterval(statusInterval);
+            }
+        });
+    }
+
     function refreshData() {
-        $('#syncBtn').prop('disabled', true).text('Processing Pages...');
+        $('#syncBtn').prop('disabled', true).text('Syncing...');
+        statusInterval = setInterval(checkSyncStatus, 1000);
         $.get('api/analytics', function(data) {
             $('#stat-total').text(data.summary.total_devices);
             $('#stat-online').text(data.summary.online);
@@ -76,6 +102,7 @@
             $('#syncBtn').prop('disabled', false).text('Sync All Data');
         });
     }
+
     $(document).ready(function() {
         $('#deviceTable').DataTable({ "ajax": "api/devices", "pageLength": 15, "columns": [{ "data": "name" }, { "data": "model" }, { "data": "ip" }, { "data": "mac" }, { "data": "status", "render": s => `<span class="badge ${s=='Active'?'bg-success':'bg-danger'}">${s}</span>` }] });
         refreshData();
