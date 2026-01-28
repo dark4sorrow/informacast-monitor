@@ -2,117 +2,84 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>InformaCast Fusion Dashboard</title>
+    <title>InformaCast Speaker Monitor</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
-        .stat-card { border: none; border-radius: 12px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .chart-lock { position: relative; height: 230px; width: 100%; overflow: hidden; }
-        #syncBar { background: #fff; border-radius: 8px; padding: 12px 20px; margin-bottom: 20px; border-left: 5px solid #0d6efd; display: none; }
+        body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
+        .stat-card { border: none; border-radius: 12px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        #syncBar { background: #000; color: #fff; padding: 10px 25px; display: none; position: sticky; top: 0; z-index: 1000; }
     </style>
 </head>
-<body class="p-4">
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h2 fw-bold text-dark mb-0">📢 InformaCast Fusion Dashboard</h1>
-            <small class="text-muted">Last successful sync: <span id="lastSyncTime">Never</span></small>
-        </div>
-        <button id="syncBtn" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="refreshData()">Sync All Data</button>
+<body>
+    <div id="syncBar" class="d-flex justify-content-between align-items-center">
+        <span><span class="spinner-grow spinner-grow-sm me-2"></span> <strong>Scanned:</strong> <span id="syncOffset">0</span> devices...</span>
+        <span><strong>Speakers Identified:</strong> <span id="syncFound" class="text-info">0</span> / 78</span>
     </div>
 
-    <div id="syncBar" class="shadow-sm">
-        <div class="d-flex justify-content-between align-items-center">
+    <div class="container-fluid p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <span class="spinner-border spinner-border-sm text-primary me-2"></span>
-                <strong class="text-primary">Syncing Fusion Data...</strong> 
-                <span id="syncDetail" class="ms-3 text-muted small">Connecting...</span>
+                <h1 class="h3 fw-bold mb-0">🔊 IP Speaker Infrastructure</h1>
+                <small class="text-muted">Last Data Pull: <span id="lastSync">Never</span></small>
             </div>
-            <div class="text-muted small fw-bold" id="syncProgress">0 items</div>
+            <button id="syncBtn" class="btn btn-dark px-4" onclick="refreshData()">Start Deep Scan</button>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-4"><div class="card stat-card p-4 text-center"><h6>IDENTIFIED SPEAKERS</h6><h2 id="stat-speakers" class="fw-bold text-primary">-</h2></div></div>
+            <div class="col-md-4"><div class="card stat-card p-4 text-center"><h6>ONLINE</h6><h2 id="stat-online" class="fw-bold text-success">-</h2></div></div>
+            <div class="col-md-4"><div class="card stat-card p-4 text-center"><h6>OFFLINE / DEFUNCT</h6><h2 id="stat-defunct" class="fw-bold text-danger">-</h2></div></div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold">Detailed Speaker Inventory</h6></div>
+            <div class="card-body p-0">
+                <table id="speakerTable" class="table table-hover mb-0">
+                    <thead><tr><th>Speaker Name</th><th>IP Address</th><th>Model Type</th><th>Status</th></tr></thead>
+                    <tbody id="speakerBody"></tbody>
+                </table>
+            </div>
         </div>
     </div>
-
-    <div class="row mb-4 text-center">
-        <div class="col-md-2"><div class="card stat-card p-3"><small class="text-muted fw-bold">TOTAL</small><h3 id="stat-total" class="fw-bold mb-0">-</h3></div></div>
-        <div class="col-md-2"><div class="card stat-card p-3 border-start border-success border-5"><small class="text-muted fw-bold text-success">ONLINE</small><h3 id="stat-online" class="text-success fw-bold mb-0">-</h3></div></div>
-        <div class="col-md-3"><div class="card stat-card p-3 border-start border-primary border-5"><small class="text-muted fw-bold text-primary">IP SPEAKERS (78)</small><h3 id="stat-speakers" class="text-primary fw-bold mb-0">-</h3></div></div>
-        <div class="col-md-3"><div class="card stat-card p-3 border-start border-info border-5"><small class="text-muted fw-bold text-info">DESKTOP NOTIFIERS</small><h3 id="stat-notifiers" class="text-info fw-bold mb-0">-</h3></div></div>
-        <div class="col-md-2"><div class="card stat-card p-3 border-start border-warning border-5"><small class="text-muted fw-bold text-warning">BROADCASTS</small><h3 id="stat-broadcasts" class="text-warning fw-bold mb-0">-</h3></div></div>
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>Infrastructure</h6><div class="chart-lock"><canvas id="deviceChart"></canvas></div></div></div>
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>Broadcast History</h6><div class="chart-lock"><canvas id="trendChart"></canvas></div></div></div>
-        <div class="col-lg-4"><div class="card shadow-sm p-3 h-100"><h6>Health Status</h6><div class="chart-lock"><canvas id="healthChart"></canvas></div></div></div>
-    </div>
-
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white py-3 sticky-top"><h6 class="mb-0 fw-bold">AND IP Speaker Detailed Status</h6></div>
-        <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
-            <table class="table table-sm table-striped mb-0">
-                <thead class="bg-light sticky-top"><tr><th>Speaker Name</th><th>IP Address</th><th>Status</th></tr></thead>
-                <tbody id="speakerTableBody"><tr><td colspan="3" class="text-center p-4 text-muted">Awaiting data...</td></tr></tbody>
-            </table>
-        </div>
-    </div>
-
-    <div class="card shadow-sm mb-4"><div class="card-header bg-white py-3"><h5>Global inventory</h5></div>
-    <div class="card-body"><table id="deviceTable" class="table table-hover w-100"><thead><tr><th>Name</th><th>Model</th><th>IP</th><th>MAC</th><th>Status</th></tr></thead></table></div></div>
-</div>
 
 <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 <script>
-    let charts = { device: null, trend: null, health: null };
-    let statusInterval = null;
-
-    function updateCharts(data) {
-        Object.values(charts).forEach(c => { if(c) c.destroy(); });
-        const opt = { maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } } };
-        charts.device = new Chart(document.getElementById('deviceChart'), { type: 'doughnut', data: { labels: Object.keys(data.device_models), datasets: [{ data: Object.values(data.device_models), backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b'] }] }, options: opt });
-        charts.health = new Chart(document.getElementById('healthChart'), { type: 'pie', data: { labels: ['Online', 'Defunct'], datasets: [{ data: [data.summary.online, data.summary.defunct], backgroundColor: ['#1cc88a', '#e74a3b'] }] }, options: opt });
-        const dates = Object.keys(data.activity_trend).sort();
-        charts.trend = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: dates, datasets: [{ label: 'Broadcasting', data: dates.map(d => data.activity_trend[d]), borderColor: '#4e73df', tension: 0.3 }] }, options: opt });
-    }
-
-    function checkSyncStatus() {
-        $.get('api/status', function(s) {
-            $('#lastSyncTime').text(s.last_success);
-            if(s.active) {
-                $('#syncBar').fadeIn();
-                $('#syncDetail').text(`Pulling ${s.endpoint} from Fusion... Offset: ${s.offset}`);
-                $('#syncProgress').text(`${s.count} items loaded`);
-            } else {
-                $('#syncBar').fadeOut();
-                clearInterval(statusInterval);
-            }
-        });
-    }
+    let statusInt = null;
 
     function refreshData() {
-        $('#syncBtn').prop('disabled', true).text('Syncing...');
-        statusInterval = setInterval(checkSyncStatus, 1000);
-        $.get('api/analytics', function(data) {
-            $('#stat-total').text(data.summary.total_devices);
-            $('#stat-online').text(data.summary.online);
+        $('#syncBtn').prop('disabled', true).text('Scanning...');
+        $('#syncBar').slideDown();
+        
+        statusInt = setInterval(() => {
+            $.get('api/status', (s) => {
+                $('#syncOffset').text(s.offset);
+                $('#syncFound').text(s.speakers_found);
+                $('#lastSync').text(s.last_success);
+                if (!s.active) {
+                    $('#syncBar').slideUp();
+                    clearInterval(statusInt);
+                }
+            });
+        }, 800);
+
+        $.get('api/analytics', (data) => {
             $('#stat-speakers').text(data.summary.speakers);
-            $('#stat-broadcasts').text(data.summary.total_broadcasts);
-            $('#stat-notifiers').text(data.device_models['DesktopNotifier'] || 0);
-            let sHtml = '';
-            data.speaker_details.forEach(s => { sHtml += `<tr><td>${s.name}</td><td>${s.ip}</td><td><span class="badge bg-${s.status=='Active'?'success':'danger'}">${s.status}</span></td></tr>`; });
-            $('#speakerTableBody').html(sHtml || '<tr><td colspan="3" class="text-center">No Speakers Found</td></tr>');
-            updateCharts(data);
-            $('#syncBtn').prop('disabled', false).text('Sync All Data');
+            $('#stat-online').text(data.summary.online);
+            $('#stat-defunct').text(data.summary.defunct);
+            
+            let html = '';
+            data.speaker_details.forEach(s => {
+                html += `<tr><td>${s.name}</td><td>${s.ip}</td><td>${s.model}</td><td><span class="badge bg-${s.status=='Active'?'success':'danger'}">${s.status}</span></td></tr>`;
+            });
+            $('#speakerBody').html(html || '<tr><td colspan="4" class="text-center">No Speakers Found</td></tr>');
+            $('#syncBtn').prop('disabled', false).text('Start Deep Scan');
         });
     }
 
-    $(document).ready(function() {
-        $('#deviceTable').DataTable({ "ajax": "api/devices", "pageLength": 15, "columns": [{ "data": "name" }, { "data": "model" }, { "data": "ip" }, { "data": "mac" }, { "data": "status", "render": s => `<span class="badge ${s=='Active'?'bg-success':'bg-danger'}">${s}</span>` }] });
-        refreshData();
-    });
+    $(document).ready(() => { refreshData(); });
 </script>
 </body>
 </html>
