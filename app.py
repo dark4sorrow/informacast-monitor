@@ -18,20 +18,20 @@ class FusionClient:
         self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     def fetch_all(self, endpoint):
-        """Advances current_offset properly to prevent infinite loops."""
+        """Advances through pages by explicitly updating the offset."""
         all_items = []
         limit = 100
         # Initialize as string "0" for the first call
-        current_offset = "0"
+        active_offset = "0"
         
-        while current_offset is not None:
-            url = f"{BASE_URL}/{endpoint}?limit={limit}&offset={current_offset}"
+        while active_offset is not None:
+            url = f"{BASE_URL}/{endpoint}?limit={limit}&offset={active_offset}"
             try:
-                print(f">>> DEBUG: Calling API - {url}", file=sys.stderr)
-                response = requests.get(url, headers=self.headers, timeout=20)
+                print(f">>> [PROCESS {os.getpid()}] Fetching {endpoint} - Offset {active_offset}", file=sys.stderr)
+                response = requests.get(url, headers=self.headers, timeout=30)
                 
                 if response.status_code == 429:
-                    print(">>> Rate Limit Hit. Waiting 10s...", file=sys.stderr)
+                    print(">>> Rate limited. Sleeping 10s...", file=sys.stderr)
                     time.sleep(10)
                     continue
                 
@@ -44,15 +44,18 @@ class FusionClient:
                     
                 all_items.extend(batch)
                 
-                # THE FIX: We must update current_offset with the 'next' value from the response
-                # to actually move to page 2, 3, etc.
-                current_offset = payload.get('next')
+                # UPDATE THE OFFSET: Get the 'next' value from the response
+                # This moves us from 0 to 100, then 100 to 200, etc.
+                active_offset = payload.get('next')
                 
-                print(f">>> DEBUG: Captured {len(batch)} items. Total: {len(all_items)}", file=sys.stderr)
+                print(f">>> [PROCESS {os.getpid()}] Batch size: {len(batch)}. Total so far: {len(all_items)}", file=sys.stderr)
                 
-                # Safety break to prevent runaway if 'next' never becomes null
+                # Small throttle to prevent 429s
+                time.sleep(0.1)
+
+                # Safety cap for your 4,133 notifiers + speakers
                 if len(all_items) > 6000:
-                    print(">>> DEBUG: Safety limit reached.", file=sys.stderr)
+                    print(">>> Safety limit reached.", file=sys.stderr)
                     break
                     
             except Exception as e:
@@ -87,7 +90,7 @@ def api_analytics():
         
         models.append(model_name)
         
-        # Identify IP Speakers (AND)
+        # Identify your 78 IP Speakers
         desc = (d.get('description') or '').upper()
         if any(x in model_name.upper() for x in ['SPEAKER', 'AND']) or 'AND ' in desc:
             speaker_details.append({
