@@ -22,16 +22,17 @@ class FusionClient:
         all_items = []
         limit = 100
         offset = 0
+        safety_gate = 0
         
-        while True:
+        while safety_gate < 100:  # Hard cap to prevent infinite loops
             url = f"{BASE_URL}/{endpoint}?limit={limit}&offset={offset}"
             try:
                 print(f">>> DEBUG: Fetching {endpoint} - Offset {offset}", file=sys.stderr)
-                response = requests.get(url, headers=self.headers, timeout=30)
+                response = requests.get(url, headers=self.headers, timeout=15)
                 
                 if response.status_code == 429:
-                    print(">>> WARNING: Rate limited. Sleeping 5s...", file=sys.stderr)
-                    time.sleep(5)
+                    print(">>> WARNING: Rate limited. Sleeping 10s...", file=sys.stderr)
+                    time.sleep(10)
                     continue
                 
                 response.raise_for_status()
@@ -43,20 +44,22 @@ class FusionClient:
                     
                 all_items.extend(batch)
                 
-                # Check if we have more pages
-                next_val = payload.get('next')
-                if next_val and str(next_val).isdigit():
-                    # THE FIX: Ensure offset actually moves forward
-                    offset = int(next_val)
-                    # Small delay to keep the API happy
-                    time.sleep(0.2) 
-                else:
+                # INCREMENT: Move offset forward by the number of items received
+                offset += len(batch)
+                safety_gate += 1
+                
+                # If we received fewer than the limit, we've reached the end
+                if len(batch) < limit:
                     break
+                
+                # Small delay to prevent hammering the API
+                time.sleep(0.1)
                     
             except Exception as e:
                 print(f">>> ERROR: {endpoint} fetch failed at offset {offset}: {e}", file=sys.stderr)
                 break
                 
+        print(f">>> SUCCESS: Retrieved {len(all_items)} total {endpoint}.", file=sys.stderr)
         return all_items
 
 client = FusionClient(FUSION_API_TOKEN)
@@ -85,8 +88,7 @@ def api_analytics():
         
         models.append(model_name)
         
-        # FILTER: Specifically identify the 78 IP Speakers
-        # Advanced Network Devices (AND) often use specific model strings
+        # Identify your 78 IP Speakers
         desc = (d.get('description') or '').upper()
         if any(x in model_name.upper() for x in ['SPEAKER', 'AND']) or 'AND ' in desc:
             speaker_details.append({
