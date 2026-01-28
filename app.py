@@ -1,6 +1,7 @@
 import os
 import requests
 import sys
+import time
 from flask import Flask, render_template, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
 from collections import Counter
@@ -17,37 +18,43 @@ class FusionClient:
         self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     def fetch_all(self, endpoint):
-        """Builds URLs using the numeric offset returned by the API."""
+        """Correctly increments the offset and respects API rate limits."""
         all_items = []
         limit = 100
         offset = 0
         
         while True:
-            # Manually build the URL using the offset
             url = f"{BASE_URL}/{endpoint}?limit={limit}&offset={offset}"
-            
             try:
-                print(f">>> DEBUG: Fetching Offset {offset}: {url}", file=sys.stderr)
+                print(f">>> DEBUG: Fetching {endpoint} - Offset {offset}", file=sys.stderr)
                 response = requests.get(url, headers=self.headers, timeout=30)
+                
+                if response.status_code == 429:
+                    print(">>> WARNING: Rate limited. Sleeping 5s...", file=sys.stderr)
+                    time.sleep(5)
+                    continue
+                
                 response.raise_for_status()
                 payload = response.json()
                 
                 batch = payload.get('data', [])
+                if not batch:
+                    break
+                    
                 all_items.extend(batch)
                 
-                # Check the 'next' field from your JSON. It returns the string "100", "200", etc.
-                next_offset = payload.get('next')
-                
-                print(f">>> DEBUG: Batch: {len(batch)}. Total: {len(all_items)}", file=sys.stderr)
-                
-                if next_offset and str(next_offset).isdigit():
-                    offset = int(next_offset)
+                # Check if we have more pages
+                next_val = payload.get('next')
+                if next_val and str(next_val).isdigit():
+                    # THE FIX: Ensure offset actually moves forward
+                    offset = int(next_val)
+                    # Small delay to keep the API happy
+                    time.sleep(0.2) 
                 else:
-                    print(f">>> DEBUG: No valid next offset. Ending loop.", file=sys.stderr)
                     break
                     
             except Exception as e:
-                print(f">>> ERROR: Pagination failed at offset {offset}: {e}", file=sys.stderr)
+                print(f">>> ERROR: {endpoint} fetch failed at offset {offset}: {e}", file=sys.stderr)
                 break
                 
         return all_items
@@ -71,7 +78,6 @@ def api_analytics():
     for d in devices:
         attrs = d.get('attributes', {})
         model_name = attrs.get('InformaCastDeviceType', 'Unknown')
-        desc = (d.get('description') or '').upper()
         is_defunct = d.get('defunct', False)
         
         if is_defunct: defunct += 1
@@ -79,9 +85,10 @@ def api_analytics():
         
         models.append(model_name)
         
-        # Filtering for your 78 AND IP Speakers
-        if any(term in model_name.upper() for term in ['SPEAKER', 'AND', 'ADVANCED']) or \
-           any(term in desc for term in ['SPEAKER', 'AND']):
+        # FILTER: Specifically identify the 78 IP Speakers
+        # Advanced Network Devices (AND) often use specific model strings
+        desc = (d.get('description') or '').upper()
+        if any(x in model_name.upper() for x in ['SPEAKER', 'AND']) or 'AND ' in desc:
             speaker_details.append({
                 'name': d.get('description') or 'Unnamed Speaker',
                 'ip': attrs.get('IPAddress', 'N/A'),
