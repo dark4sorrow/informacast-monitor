@@ -1,4 +1,4 @@
-import os, requests, sys, time, threading, json
+import os, requests, sys, time, threading
 from datetime import datetime
 from flask import Flask, render_template, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -17,14 +17,16 @@ def run_sync():
     with state_lock:
         state.update({"is_syncing": True, "offset": 0, "total": 0, "devices": []})
 
-    local_offset = "0"
+    # The offset must be a string as the API returns it (e.g., "100", "200")
+    active_offset = "0"
     local_devices = []
     seen_ids = set()
 
-    while local_offset is not None:
-        url = f"{BASE_URL}/devices?limit=100&offset={local_offset}"
+    while active_offset is not None:
+        url = f"{BASE_URL}/devices?limit=100&offset={active_offset}"
         try:
-            print(f">>> [API PULL] Offset {local_offset}", file=sys.stderr)
+            # Force output so you can see it moving in the terminal
+            print(f">>> [API PULL] Calling Offset: {active_offset}", file=sys.stderr)
             sys.stderr.flush()
             
             resp = requests.get(url, headers={"Authorization": f"Bearer {FUSION_API_TOKEN}"}, timeout=20)
@@ -48,14 +50,17 @@ def run_sync():
                     })
                     seen_ids.add(d['id'])
 
-            local_offset = payload.get('next') # This moves us to "100", "200", etc.
+            # THE CRITICAL FIX: Update the offset variable with the 'next' value from the API
+            active_offset = payload.get('next') 
             
             with state_lock:
-                state["offset"] = int(local_offset) if local_offset else state["offset"]
+                # Store as integer for the UI counter
+                state["offset"] = int(active_offset) if active_offset else state["offset"]
                 state["total"] = len(local_devices)
                 state["devices"] = local_devices
 
-            if len(local_devices) > 16000: break # Hard safety
+            # Hard stop safety (Total notifiers ~4133 + speakers/phones)
+            if len(local_devices) > 16000: break 
             time.sleep(0.01)
         except Exception as e:
             print(f">>> ERROR: {e}", file=sys.stderr); break
