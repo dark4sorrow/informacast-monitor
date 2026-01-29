@@ -17,16 +17,16 @@ def run_sync():
     with state_lock:
         state.update({"is_syncing": True, "offset": 0, "total": 0, "devices": []})
 
-    # The offset must be a string as the API returns it (e.g., "100", "200")
-    active_offset = "0"
+    # Use a numeric tracker instead of relying on the API's 'next' field string
+    current_offset = 0
+    limit = 100
     local_devices = []
     seen_ids = set()
 
-    while active_offset is not None:
-        url = f"{BASE_URL}/devices?limit=100&offset={active_offset}"
+    while True:
+        url = f"{BASE_URL}/devices?limit={limit}&offset={current_offset}"
         try:
-            # Force output so you can see it moving in the terminal
-            print(f">>> [API PULL] Calling Offset: {active_offset}", file=sys.stderr)
+            print(f">>> [API PULL] Requesting Offset: {current_offset}", file=sys.stderr)
             sys.stderr.flush()
             
             resp = requests.get(url, headers={"Authorization": f"Bearer {FUSION_API_TOKEN}"}, timeout=20)
@@ -36,7 +36,11 @@ def run_sync():
             
             payload = resp.json()
             data = payload.get('data', [])
-            if not data: break
+            
+            # If the current page is empty, we have reached the end
+            if not data: 
+                print(">>> End of data reached.", file=sys.stderr)
+                break
 
             for d in data:
                 if d['id'] not in seen_ids:
@@ -50,17 +54,19 @@ def run_sync():
                     })
                     seen_ids.add(d['id'])
 
-            # THE CRITICAL FIX: Update the offset variable with the 'next' value from the API
-            active_offset = payload.get('next') 
+            # THE CRITICAL FIX: Manually add the number of items received to the offset.
+            # This forces the next request to start at 100, 200, 300, etc.
+            current_offset += len(data)
             
             with state_lock:
-                # Store as integer for the UI counter
-                state["offset"] = int(active_offset) if active_offset else state["offset"]
+                state["offset"] = current_offset
                 state["total"] = len(local_devices)
                 state["devices"] = local_devices
 
-            # Hard stop safety (Total notifiers ~4133 + speakers/phones)
-            if len(local_devices) > 16000: break 
+            # Stop if the batch was smaller than the limit (means we're on the last page)
+            if len(data) < limit or len(local_devices) > 16000: 
+                break 
+                
             time.sleep(0.01)
         except Exception as e:
             print(f">>> ERROR: {e}", file=sys.stderr); break
