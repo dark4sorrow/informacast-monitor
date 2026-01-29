@@ -1,74 +1,93 @@
-import os, requests, sys, time, json
-from flask import Flask, render_template, Response, stream_with_context
+import os, requests, sys, time, threading, json
+from datetime import datetime
+from flask import Flask, render_template, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 
-# --- CONFIGURATION ---
+# Persist the state globally
+state = {
+    "is_syncing": False,
+    "offset": 0,
+    "total_captured": 0,
+    "last_sync": "Never",
+    "master_devices": [] # This will hold all 15,000 items
+}
+state_lock = threading.Lock()
+
 FUSION_API_TOKEN = os.getenv('FUSION_API_TOKEN', 'FHIXRHKMSII6RPKVNXX5C733N5KRB4MQJSJBD2F5KUCWJYHHJKI4PJ4UZRUIQZGDDJPK7U7ACTMLNSHK2VHSZUFCFARTYFKDQTMQEQA=')
 BASE_URL = "https://api.icmobile.singlewire.com/api/v1"
+
+def run_sync():
+    global state
+    with state_lock:
+        state.update({"is_syncing": True, "offset": 0, "total_captured": 0, "master_devices": []})
+
+    current_offset = 0
+    limit = 100
+    seen_ids = set()
+
+    while True:
+        url = f"{BASE_URL}/devices?limit={limit}&offset={current_offset}"
+        try:
+            print(f">>> [FETCHING] Requesting Offset: {current_offset}", file=sys.stderr)
+            sys.stderr.flush()
+            
+            resp = requests.get(url, headers={"Authorization": f"Bearer {FUSION_API_TOKEN}"}, timeout=20)
+            if resp.status_code == 429:
+                time.sleep(10); continue
+            resp.raise_for_status()
+            
+            data = resp.json().get('data', [])
+            if not data: break
+
+            new_batch = []
+            for d in data:
+                if d['id'] not in seen_ids:
+                    attrs = d.get('attributes', {})
+                    new_batch.append({
+                        'number': len(state["master_devices"]) + len(new_batch) + 1,
+                        'name': d.get('description') or 'No Name',
+                        'ip': attrs.get('IPAddress', 'N/A'),
+                        'model': attrs.get('InformaCastDeviceType', 'N/A'),
+                        'status': "Active" if not d.get('defunct') else "Defunct",
+                        'raw': d
+                    })
+                    seen_ids.add(d['id'])
+
+            # Increment offset by the batch size
+            current_offset += len(data)
+            
+            # ATOMIC UPDATE: Append the batch to the master list
+            with state_lock:
+                state["offset"] = current_offset
+                state["master_devices"].extend(new_batch)
+                state["total_captured"] = len(state["master_devices"])
+
+            if len(data) < limit or current_offset >= 16000: break
+            time.sleep(0.05)
+        except Exception as e:
+            print(f">>> ERROR: {e}", file=sys.stderr); break
+
+    with state_lock:
+        state["is_syncing"] = False
+        state["last_sync"] = datetime.now().strftime("%I:%M:%S %p")
 
 @app.route('/')
 def index():
     return render_template('dashboard.html')
 
-@app.route('/api/stream_devices')
-def stream_devices():
-    def generate():
-        current_offset = 0
-        limit = 100
-        total_sent = 0
-        seen_ids = set()
+@app.route('/api/status')
+def get_status():
+    with state_lock:
+        return jsonify(state)
 
-        headers = {"Authorization": f"Bearer {FUSION_API_TOKEN}", "Content-Type": "application/json"}
-
-        while True:
-            url = f"{BASE_URL}/devices?limit={limit}&offset={current_offset}"
-            try:
-                print(f">>> [STREAMING] Requesting Offset: {current_offset}", file=sys.stderr)
-                sys.stderr.flush()
-                
-                resp = requests.get(url, headers=headers, timeout=20)
-                if resp.status_code == 429:
-                    time.sleep(5)
-                    continue
-                resp.raise_for_status()
-                
-                data = resp.json().get('data', [])
-                if not data:
-                    break
-
-                batch_to_send = []
-                for d in data:
-                    if d['id'] not in seen_ids:
-                        attrs = d.get('attributes', {})
-                        total_sent += 1
-                        batch_to_send.append({
-                            'number': total_sent,
-                            'name': d.get('description') or 'No Name',
-                            'ip': attrs.get('IPAddress', 'N/A'),
-                            'model': attrs.get('InformaCastDeviceType', 'N/A'),
-                            'status': "Active" if not d.get('defunct') else "Defunct",
-                            'raw': d
-                        })
-                        seen_ids.add(d['id'])
-
-                # Yield this batch as a Server-Sent Event (SSE)
-                yield f"data: {json.dumps(batch_to_send)}\n\n"
-
-                current_offset += len(data)
-                if len(data) < limit or total_sent >= 16000:
-                    break
-                
-                time.sleep(0.05)
-            except Exception as e:
-                print(f">>> ERROR: {e}", file=sys.stderr)
-                break
-        
-        yield "event: close\ndata: done\n\n"
-
-    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+@app.route('/api/trigger_sync')
+def trigger():
+    if not state["is_syncing"]:
+        threading.Thread(target=run_sync).start()
+    return jsonify({"status": "started"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5082)
