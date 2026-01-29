@@ -17,7 +17,6 @@ def run_sync():
     with state_lock:
         state.update({"is_syncing": True, "offset": 0, "total": 0, "devices": []})
 
-    # Use a numeric tracker instead of relying on the API's 'next' field string
     current_offset = 0
     limit = 100
     local_devices = []
@@ -26,7 +25,7 @@ def run_sync():
     while True:
         url = f"{BASE_URL}/devices?limit={limit}&offset={current_offset}"
         try:
-            print(f">>> [API PULL] Requesting Offset: {current_offset}", file=sys.stderr)
+            print(f">>> [API PULL] Offset: {current_offset}", file=sys.stderr)
             sys.stderr.flush()
             
             resp = requests.get(url, headers={"Authorization": f"Bearer {FUSION_API_TOKEN}"}, timeout=20)
@@ -36,16 +35,15 @@ def run_sync():
             
             payload = resp.json()
             data = payload.get('data', [])
-            
-            # If the current page is empty, we have reached the end
-            if not data: 
-                print(">>> End of data reached.", file=sys.stderr)
-                break
+            if not data: break
 
             for d in data:
                 if d['id'] not in seen_ids:
                     attrs = d.get('attributes', {})
+                    # Numbering based on the length of the list so far + 1
+                    current_number = len(local_devices) + 1
                     local_devices.append({
+                        'number': current_number, # Sequential numbering
                         'name': d.get('description') or 'No Name',
                         'ip': attrs.get('IPAddress', 'N/A'),
                         'model': attrs.get('InformaCastDeviceType', 'N/A'),
@@ -54,19 +52,14 @@ def run_sync():
                     })
                     seen_ids.add(d['id'])
 
-            # THE CRITICAL FIX: Manually add the number of items received to the offset.
-            # This forces the next request to start at 100, 200, 300, etc.
-            current_offset += len(data)
+            current_offset += len(data) # Force move to next page
             
             with state_lock:
                 state["offset"] = current_offset
                 state["total"] = len(local_devices)
                 state["devices"] = local_devices
 
-            # Stop if the batch was smaller than the limit (means we're on the last page)
-            if len(data) < limit or len(local_devices) > 16000: 
-                break 
-                
+            if len(data) < limit or len(local_devices) > 16000: break 
             time.sleep(0.01)
         except Exception as e:
             print(f">>> ERROR: {e}", file=sys.stderr); break

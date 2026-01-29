@@ -2,35 +2,35 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>InformaCast Global Audit</title>
+    <title>InformaCast Sequential Audit</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background: #f8f9fa; font-family: sans-serif; }
         #syncProgress { background: #000; color: #fff; padding: 15px; display: none; position: sticky; top: 0; z-index: 1000; }
-        pre { font-size: 10px; background: #eee; padding: 8px; max-height: 150px; overflow: auto; }
+        .row-num { font-weight: bold; color: #6c757d; width: 50px; }
     </style>
 </head>
 <body class="p-4">
     <div id="syncProgress">
         <div class="container-fluid d-flex justify-content-between align-items-center">
-            <span>🔄 PULLING ALL RECORDS...</span>
-            <span class="fw-bold">Current Offset: <span id="pulseOffset">0</span></span>
-            <span class="text-info">Total Loaded: <span id="pulseTotal">0</span></span>
+            <span>🔄 FETCHING ALL ENDPOINTS...</span>
+            <span class="fw-bold">Scanned Offset: <span id="pulseOffset">0</span></span>
+            <span class="text-info">Items Numbered: <span id="pulseTotal">0</span></span>
         </div>
     </div>
 
     <div class="container-fluid mt-3">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <div><h2 class="fw-bold mb-0">📡 Global Fusion Audit</h2><small id="lastSync">Last Sync: Never</small></div>
+            <div><h2 class="fw-bold mb-0">📡 Sequential Device List</h2><small id="lastSync">Freshness: Never</small></div>
             <div class="d-flex gap-2">
-                <input type="text" id="tableSearch" class="form-control" placeholder="Search names or IPs..." style="width: 300px;">
-                <button class="btn btn-primary fw-bold" onclick="startSync()">Reload All 15,000 Items</button>
+                <input type="text" id="tableSearch" class="form-control" placeholder="Search entries..." style="width: 300px;">
+                <button class="btn btn-primary fw-bold" onclick="startSync()">Reload All Records</button>
             </div>
         </div>
 
         <div class="card shadow-sm border-0">
             <div class="card-body p-0"><table class="table table-hover mb-0">
-                <thead><tr><th>Name</th><th>IP</th><th>Model</th><th>Status</th><th>JSON</th></tr></thead>
+                <thead><tr><th>#</th><th>Device Name</th><th>IP Address</th><th>Model Type</th><th>Status</th><th>Raw</th></tr></thead>
                 <tbody id="mainBody"></tbody>
             </table></div>
         </div>
@@ -51,23 +51,24 @@
         data.forEach((d, i) => {
             if (!term || d.name.toUpperCase().includes(term) || d.ip.includes(term)) {
                 html += `<tr>
+                    <td class="row-num">${d.number}</td>
                     <td><small>${d.name}</small></td>
                     <td>${d.ip}</td>
                     <td><span class="badge bg-secondary">${d.model}</span></td>
                     <td><span class="badge bg-${d.status=='Active'?'success':'danger'}">${d.status}</span></td>
                     <td><button class="btn btn-sm btn-outline-dark" onclick="$('#raw-${i}').toggle()">View</button></td>
                 </tr>
-                <tr id="raw-${i}" style="display:none"><td colspan="5"><pre>${JSON.stringify(d.raw, null, 2)}</pre></td></tr>`;
+                <tr id="raw-${i}" style="display:none"><td colspan="6"><pre style="font-size: 10px; background: #eee; padding: 10px;">${JSON.stringify(d.raw, null, 2)}</pre></td></tr>`;
             }
         });
-        $('#mainBody').html(html || '<tr><td colspan="5" class="text-center p-4">No results</td></tr>');
+        $('#mainBody').html(html || '<tr><td colspan="6" class="text-center p-4">Awaiting data sequence...</td></tr>');
     }
 
     function refresh() {
         $.get('api/status', (s) => {
             $('#pulseOffset').text(s.offset);
             $('#pulseTotal').text(s.total);
-            $('#lastSync').text(`Last Sync: ${s.last_sync}`);
+            $('#lastSync').text(`Freshness: ${s.last_sync}`);
             allData = s.devices;
             renderTable(allData);
             if (s.is_syncing) { $('#syncProgress').show(); } 
