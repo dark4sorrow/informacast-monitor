@@ -2,50 +2,36 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>InformaCast Master Audit</title>
+    <title>InformaCast Cumulative Audit</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <style>
         body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
-        .stat-card { border: none; border-radius: 12px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         #syncProgress { background: #000; color: #fff; padding: 15px; display: none; position: sticky; top: 0; z-index: 1000; }
-        .row-num { font-weight: bold; color: #6c757d; }
         pre { font-size: 10px; background: #eee; padding: 10px; border-radius: 5px; max-height: 200px; overflow: auto; }
     </style>
 </head>
 <body class="p-4">
     <div id="syncProgress">
         <div class="container-fluid d-flex justify-content-between align-items-center">
-            <span><span class="spinner-border spinner-border-sm text-primary me-2"></span> SYNCING EVERY ENDPOINT...</span>
+            <span>🔄 APPENDING NEW DATA...</span>
             <span class="fw-bold">API Offset: <span id="pulseOffset">0</span></span>
-            <span class="text-info">Total Accumulated: <span id="pulseTotal">0</span></span>
+            <span class="text-info">Total Appended: <span id="pulseTotal">0</span></span>
         </div>
     </div>
 
     <div class="container-fluid mt-3">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2 class="fw-bold text-dark mb-0">📡 Fusion Master Inventory</h2>
-                <small id="lastSync" class="text-muted">Status: Never Synced</small>
-            </div>
-            <button id="syncBtn" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="startSync()">Start Full 15,000 Item Pull</button>
+            <div><h2 class="fw-bold text-dark mb-0">📡 Cumulative Device Audit</h2>
+            <small id="lastSync" class="text-muted">Last Pull: Never</small></div>
+            <button id="syncBtn" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="startSync()">Start Appending Scan</button>
         </div>
 
         <div class="card shadow-sm border-0">
             <div class="card-body p-4">
                 <table id="masterTable" class="table table-hover w-100">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Device Name</th>
-                            <th>IP Address</th>
-                            <th>Model Type</th>
-                            <th>Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="mainBody">
-                        </tbody>
+                    <thead><tr><th>#</th><th>Device Name</th><th>IP Address</th><th>Model</th><th>Status</th><th>Details</th></tr></thead>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
@@ -58,11 +44,11 @@
 <script>
     let timer = null;
     let dataTable = null;
+    let lastRenderedCount = 0; // Tracks how many we've already put in the table
 
     $(document).ready(function() {
-        // Initialize DataTables
         dataTable = $('#masterTable').DataTable({
-            pageLength: 25,
+            pageLength: 50,
             order: [[0, 'asc']],
             columns: [
                 { data: 'number' },
@@ -73,14 +59,13 @@
                 { data: 'action' }
             ]
         });
-        refresh();
     });
 
     function startSync() {
+        lastRenderedCount = 0;
+        dataTable.clear().draw();
         $('#syncBtn').prop('disabled', true).text('Syncing...');
-        $.get('api/trigger_sync', () => { 
-            timer = setInterval(refresh, 1500); 
-        });
+        $.get('api/trigger_sync', () => { timer = setInterval(refresh, 1500); });
     }
 
     function refresh() {
@@ -89,31 +74,26 @@
             $('#pulseTotal').text(s.total);
             $('#lastSync').text(`Last Sync: ${s.last_sync}`);
 
-            // Clear and rebuild table data
-            const rows = s.master_list.map((d, i) => ({
-                number: d.number,
-                name: `<small>${d.name}</small>`,
-                ip: d.ip,
-                model: `<span class="badge bg-secondary">${d.model}</span>`,
-                status: `<span class="badge bg-${d.status=='Active'?'success':'danger'}">${d.status}</span>`,
-                action: `<button class="btn btn-sm btn-outline-dark" onclick="toggleRaw(${i})">JSON</button>
-                         <div id="raw-${i}" style="display:none" class="mt-2"><pre>${JSON.stringify(d.raw, null, 2)}</pre></div>`
-            }));
+            // ONLY ADD THE NEW ITEMS (Append mode)
+            if (s.master_list.length > lastRenderedCount) {
+                const newItems = s.master_list.slice(lastRenderedCount);
+                const rowsToAdd = newItems.map((d, i) => ({
+                    number: d.number,
+                    name: `<small>${d.name}</small>`,
+                    ip: d.ip,
+                    model: `<span class="badge bg-secondary">${d.model}</span>`,
+                    status: `<span class="badge bg-${d.status=='Active'?'success':'danger'}">${d.status}</span>`,
+                    action: `<button class="btn btn-sm btn-outline-dark" onclick="$('#raw-${d.number}').toggle()">JSON</button>
+                             <div id="raw-${d.number}" style="display:none" class="mt-2"><pre>${JSON.stringify(d.raw, null, 2)}</pre></div>`
+                }));
 
-            dataTable.clear().rows.add(rows).draw(false);
-
-            if (s.is_syncing) { 
-                $('#syncProgress').show(); 
-            } else { 
-                $('#syncProgress').hide(); 
-                $('#syncBtn').prop('disabled', false).text('Start Full 15,000 Item Pull');
-                clearInterval(timer); 
+                dataTable.rows.add(rowsToAdd).draw(false);
+                lastRenderedCount = s.master_list.length;
             }
-        });
-    }
 
-    function toggleRaw(id) {
-        $(`#raw-${id}`).toggle();
+            if (s.is_syncing) { $('#syncProgress').show(); } 
+            else { $('#syncProgress').hide(); $('#syncBtn').prop('disabled', false).text('Start Appending Scan'); clearInterval(timer); }
+        });
     }
 </script>
 </body>
