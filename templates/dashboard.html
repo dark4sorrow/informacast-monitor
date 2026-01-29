@@ -2,36 +2,36 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>InformaCast Global Inventory</title>
+    <title>InformaCast Global Audit</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
-        .stat-card { border: none; border-radius: 12px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        body { background: #f8f9fa; font-family: sans-serif; }
         #syncProgress { background: #000; color: #fff; padding: 15px; display: none; position: sticky; top: 0; z-index: 1000; }
-        pre { font-size: 11px; background: #f1f1f1; padding: 10px; border-radius: 5px; max-height: 200px; overflow: auto; }
+        pre { font-size: 10px; background: #eee; padding: 8px; max-height: 150px; overflow: auto; }
     </style>
 </head>
 <body class="p-4">
     <div id="syncProgress">
         <div class="container-fluid d-flex justify-content-between align-items-center">
-            <span><span class="spinner-border spinner-border-sm text-primary me-2"></span> DATA PULL IN PROGRESS...</span>
-            <span class="fw-bold"><span id="pulseOffset">0</span> devices processed</span>
-            <span class="text-info">Total in List: <span id="pulseFound">0</span></span>
+            <span>🔄 PULLING ALL RECORDS...</span>
+            <span class="fw-bold">Current Offset: <span id="pulseOffset">0</span></span>
+            <span class="text-info">Total Loaded: <span id="pulseTotal">0</span></span>
         </div>
     </div>
 
     <div class="container-fluid mt-3">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <div><h1 class="h3 fw-bold text-dark mb-0">📡 Complete InformaCast Inventory</h1>
-            <small class="text-muted">Last Sync: <span id="lastSync">Never</span></small></div>
-            <button id="syncBtn" class="btn btn-primary px-4 fw-bold" onclick="startScan()">Fetch All 4,000+ Items</button>
+            <div><h2 class="fw-bold mb-0">📡 Global Fusion Audit</h2><small id="lastSync">Last Sync: Never</small></div>
+            <div class="d-flex gap-2">
+                <input type="text" id="tableSearch" class="form-control" placeholder="Search names or IPs..." style="width: 300px;">
+                <button class="btn btn-primary fw-bold" onclick="startSync()">Reload All 15,000 Items</button>
+            </div>
         </div>
 
         <div class="card shadow-sm border-0">
-            <div class="card-header bg-white py-3 fw-bold">Every Device Found in Fusion API</div>
             <div class="card-body p-0"><table class="table table-hover mb-0">
-                <thead><tr><th>Name</th><th>IP Address</th><th>Model</th><th>Status</th><th>Details</th></tr></thead>
-                <tbody id="deviceBody"></tbody>
+                <thead><tr><th>Name</th><th>IP</th><th>Model</th><th>Status</th><th>JSON</th></tr></thead>
+                <tbody id="mainBody"></tbody>
             </table></div>
         </div>
     </div>
@@ -39,37 +39,43 @@
 <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
 <script>
     let timer = null;
+    let allData = [];
 
-    function startScan() {
-        $('#syncBtn').prop('disabled', true).text('Loading API...');
-        $.get('api/trigger_sync', () => { timer = setInterval(refreshUI, 1000); });
+    function startSync() {
+        $.get('api/trigger_sync', () => { timer = setInterval(refresh, 1000); });
     }
 
-    function refreshUI() {
-        $.get('api/status', (s) => {
-            $('#pulseOffset').text(s.offset);
-            $('#pulseFound').text(s.total_captured);
-            $('#lastSync').text(s.last_sync);
-
-            let html = '';
-            s.all_devices.forEach((d, index) => {
+    function renderTable(data) {
+        let term = $('#tableSearch').val().toUpperCase();
+        let html = '';
+        data.forEach((d, i) => {
+            if (!term || d.name.toUpperCase().includes(term) || d.ip.includes(term)) {
                 html += `<tr>
                     <td><small>${d.name}</small></td>
                     <td>${d.ip}</td>
                     <td><span class="badge bg-secondary">${d.model}</span></td>
                     <td><span class="badge bg-${d.status=='Active'?'success':'danger'}">${d.status}</span></td>
-                    <td><button class="btn btn-sm btn-outline-dark" onclick='toggleRaw(${index})'>Raw JSON</button></td>
+                    <td><button class="btn btn-sm btn-outline-dark" onclick="$('#raw-${i}').toggle()">View</button></td>
                 </tr>
-                <tr id="raw-${index}" style="display:none"><td colspan="5"><pre>${JSON.stringify(d.raw, null, 2)}</pre></td></tr>`;
-            });
-            $('#deviceBody').html(html || '<tr><td colspan="5" class="text-center p-4">Waiting for first batch...</td></tr>');
+                <tr id="raw-${i}" style="display:none"><td colspan="5"><pre>${JSON.stringify(d.raw, null, 2)}</pre></td></tr>`;
+            }
+        });
+        $('#mainBody').html(html || '<tr><td colspan="5" class="text-center p-4">No results</td></tr>');
+    }
 
-            if (s.is_syncing) { $('#syncProgress').slideDown(); } 
-            else { $('#syncProgress').fadeOut(); $('#syncBtn').prop('disabled', false).text('Fetch All 4,000+ Items'); clearInterval(timer); }
+    function refresh() {
+        $.get('api/status', (s) => {
+            $('#pulseOffset').text(s.offset);
+            $('#pulseTotal').text(s.total);
+            $('#lastSync').text(`Last Sync: ${s.last_sync}`);
+            allData = s.devices;
+            renderTable(allData);
+            if (s.is_syncing) { $('#syncProgress').show(); } 
+            else { $('#syncProgress').hide(); clearInterval(timer); }
         });
     }
-    function toggleRaw(id) { $(`#raw-${id}`).toggle(); }
-    $(document).ready(() => { refreshUI(); });
+    $('#tableSearch').on('keyup', () => renderTable(allData));
+    $(document).ready(refresh);
 </script>
 </body>
 </html>

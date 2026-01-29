@@ -1,9 +1,4 @@
-import os
-import requests
-import sys
-import time
-import threading
-import json
+import os, requests, sys, time, threading, json
 from datetime import datetime
 from flask import Flask, render_template, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -11,30 +6,22 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 
-# Global State for Every Single Item
-state = {
-    "is_syncing": False,
-    "offset": 0,
-    "total_captured": 0,
-    "last_sync": "Never",
-    "all_devices": []  # NOW STORES EVERYTHING
-}
+state = {"is_syncing": False, "offset": 0, "total": 0, "last_sync": "Never", "devices": []}
 state_lock = threading.Lock()
 
 FUSION_API_TOKEN = os.getenv('FUSION_API_TOKEN', 'FHIXRHKMSII6RPKVNXX5C733N5KRB4MQJSJBD2F5KUCWJYHHJKI4PJ4UZRUIQZGDDJPK7U7ACTMLNSHK2VHSZUFCFARTYFKDQTMQEQA=')
 BASE_URL = "https://api.icmobile.singlewire.com/api/v1"
 
 def run_sync():
-    """Pulls every single device from the API without filtering."""
     global state
     with state_lock:
-        state.update({"is_syncing": True, "offset": 0, "total_captured": 0, "all_devices": []})
+        state.update({"is_syncing": True, "offset": 0, "total": 0, "devices": []})
 
-    local_offset = 0
-    local_storage = []
+    local_offset = "0"
+    local_devices = []
     seen_ids = set()
 
-    while True:
+    while local_offset is not None:
         url = f"{BASE_URL}/devices?limit=100&offset={local_offset}"
         try:
             print(f">>> [API PULL] Offset {local_offset}", file=sys.stderr)
@@ -45,34 +32,33 @@ def run_sync():
                 time.sleep(10); continue
             resp.raise_for_status()
             
-            data = resp.json().get('data', [])
+            payload = resp.json()
+            data = payload.get('data', [])
             if not data: break
 
             for d in data:
                 if d['id'] not in seen_ids:
                     attrs = d.get('attributes', {})
-                    # Add everything with its full raw data preserved
-                    local_storage.append({
-                        'name': d.get('description') or 'No Description',
+                    local_devices.append({
+                        'name': d.get('description') or 'No Name',
                         'ip': attrs.get('IPAddress', 'N/A'),
                         'model': attrs.get('InformaCastDeviceType', 'N/A'),
                         'status': "Active" if not d.get('defunct') else "Defunct",
-                        'raw': d  # KEEPING FULL JSON FOR DEBUGGING
+                        'raw': d
                     })
                     seen_ids.add(d['id'])
 
-            local_offset += len(data)
+            local_offset = payload.get('next') # This moves us to "100", "200", etc.
             
-            # Update global state immediately for the UI pulse
             with state_lock:
-                state["offset"] = local_offset
-                state["total_captured"] = len(local_storage)
-                state["all_devices"] = local_storage
+                state["offset"] = int(local_offset) if local_offset else state["offset"]
+                state["total"] = len(local_devices)
+                state["devices"] = local_devices
 
-            if len(data) < 100 or local_offset >= 15000: break
+            if len(local_devices) > 16000: break # Hard safety
             time.sleep(0.01)
         except Exception as e:
-            print(f">>> ERROR: {e}", file=sys.stderr); sys.stderr.flush(); break
+            print(f">>> ERROR: {e}", file=sys.stderr); break
 
     with state_lock:
         state["is_syncing"] = False
