@@ -2,36 +2,43 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>InformaCast Cumulative Audit</title>
+    <title>InformaCast Live Stream Audit</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <style>
         body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
         #syncProgress { background: #000; color: #fff; padding: 15px; display: none; position: sticky; top: 0; z-index: 1000; }
-        pre { font-size: 10px; background: #eee; padding: 10px; border-radius: 5px; max-height: 200px; overflow: auto; }
+        pre { font-size: 10px; background: #eee; padding: 10px; max-height: 150px; overflow: auto; }
     </style>
 </head>
 <body class="p-4">
     <div id="syncProgress">
         <div class="container-fluid d-flex justify-content-between align-items-center">
-            <span>🔄 APPENDING NEW DATA...</span>
-            <span class="fw-bold">API Offset: <span id="pulseOffset">0</span></span>
-            <span class="text-info">Total Appended: <span id="pulseTotal">0</span></span>
+            <span><span class="spinner-grow spinner-grow-sm text-primary me-2"></span> LIVE STREAMING FROM FUSION...</span>
+            <span class="fw-bold">Total Items Received: <span id="pulseTotal">0</span></span>
         </div>
     </div>
 
     <div class="container-fluid mt-3">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <div><h2 class="fw-bold text-dark mb-0">📡 Cumulative Device Audit</h2>
-            <small id="lastSync" class="text-muted">Last Pull: Never</small></div>
-            <button id="syncBtn" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="startSync()">Start Appending Scan</button>
+            <h2 class="fw-bold text-dark mb-0">📡 Real-Time Device Inventory</h2>
+            <button id="syncBtn" class="btn btn-primary px-4 fw-bold" onclick="startLiveStream()">Start Live Stream</button>
         </div>
 
         <div class="card shadow-sm border-0">
             <div class="card-body p-4">
                 <table id="masterTable" class="table table-hover w-100">
-                    <thead><tr><th>#</th><th>Device Name</th><th>IP Address</th><th>Model</th><th>Status</th><th>Details</th></tr></thead>
-                    <tbody></tbody>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>IP Address</th>
+                            <th>Model</th>
+                            <th>Status</th>
+                            <th>Raw</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mainBody"></tbody>
                 </table>
             </div>
         </div>
@@ -42,13 +49,11 @@
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 
 <script>
-    let timer = null;
     let dataTable = null;
-    let lastRenderedCount = 0; // Tracks how many we've already put in the table
 
     $(document).ready(function() {
         dataTable = $('#masterTable').DataTable({
-            pageLength: 50,
+            pageLength: 100,
             order: [[0, 'asc']],
             columns: [
                 { data: 'number' },
@@ -61,39 +66,42 @@
         });
     });
 
-    function startSync() {
-        lastRenderedCount = 0;
+    function startLiveStream() {
+        $('#syncBtn').prop('disabled', true).text('Streaming...');
+        $('#syncProgress').slideDown();
         dataTable.clear().draw();
-        $('#syncBtn').prop('disabled', true).text('Syncing...');
-        $.get('api/trigger_sync', () => { timer = setInterval(refresh, 1500); });
-    }
 
-    function refresh() {
-        $.get('api/status', (s) => {
-            $('#pulseOffset').text(s.offset);
-            $('#pulseTotal').text(s.total);
-            $('#lastSync').text(`Last Sync: ${s.last_sync}`);
+        const eventSource = new EventSource('/api/stream_devices');
 
-            // ONLY ADD THE NEW ITEMS (Append mode)
-            if (s.master_list.length > lastRenderedCount) {
-                const newItems = s.master_list.slice(lastRenderedCount);
-                const rowsToAdd = newItems.map((d, i) => ({
-                    number: d.number,
-                    name: `<small>${d.name}</small>`,
-                    ip: d.ip,
-                    model: `<span class="badge bg-secondary">${d.model}</span>`,
-                    status: `<span class="badge bg-${d.status=='Active'?'success':'danger'}">${d.status}</span>`,
-                    action: `<button class="btn btn-sm btn-outline-dark" onclick="$('#raw-${d.number}').toggle()">JSON</button>
-                             <div id="raw-${d.number}" style="display:none" class="mt-2"><pre>${JSON.stringify(d.raw, null, 2)}</pre></div>`
-                }));
+        eventSource.onmessage = function(event) {
+            const newBatch = JSON.parse(event.data);
+            
+            const rowsToAdd = newBatch.map(d => ({
+                number: d.number,
+                name: `<small>${d.name}</small>`,
+                ip: d.ip,
+                model: `<span class="badge bg-secondary">${d.model}</span>`,
+                status: `<span class="badge bg-${d.status=='Active'?'success':'danger'}">${d.status}</span>`,
+                action: `<button class="btn btn-sm btn-outline-dark" onclick="$('#raw-${d.number}').toggle()">JSON</button>
+                         <div id="raw-${d.number}" style="display:none" class="mt-2"><pre>${JSON.stringify(d.raw, null, 2)}</pre></div>`
+            }));
 
-                dataTable.rows.add(rowsToAdd).draw(false);
-                lastRenderedCount = s.master_list.length;
-            }
+            dataTable.rows.add(rowsToAdd).draw(false);
+            $('#pulseTotal').text(dataTable.rows().count());
+        };
 
-            if (s.is_syncing) { $('#syncProgress').show(); } 
-            else { $('#syncProgress').hide(); $('#syncBtn').prop('disabled', false).text('Start Appending Scan'); clearInterval(timer); }
+        eventSource.addEventListener('close', function(e) {
+            eventSource.close();
+            $('#syncProgress').fadeOut();
+            $('#syncBtn').prop('disabled', false).text('Start Live Stream');
         });
+
+        eventSource.onerror = function(err) {
+            console.error("Stream failed:", err);
+            eventSource.close();
+            $('#syncProgress').fadeOut();
+            $('#syncBtn').prop('disabled', false).text('Start Live Stream');
+        };
     }
 </script>
 </body>
