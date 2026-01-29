@@ -19,13 +19,14 @@ def run_sync():
 
     current_offset = 0
     limit = 100
-    local_devices = []
+    accumulated_devices = [] # Use this to store everything across all pages
     seen_ids = set()
 
     while True:
+        # Explicitly pass limit and offset
         url = f"{BASE_URL}/devices?limit={limit}&offset={current_offset}"
         try:
-            print(f">>> [API PULL] Offset: {current_offset}", file=sys.stderr)
+            print(f">>> [FETCHING PAGE] Offset: {current_offset}", file=sys.stderr)
             sys.stderr.flush()
             
             resp = requests.get(url, headers={"Authorization": f"Bearer {FUSION_API_TOKEN}"}, timeout=20)
@@ -35,15 +36,16 @@ def run_sync():
             
             payload = resp.json()
             data = payload.get('data', [])
-            if not data: break
+            
+            if not data: 
+                print(">>> No more data returned from API.", file=sys.stderr)
+                break
 
             for d in data:
                 if d['id'] not in seen_ids:
                     attrs = d.get('attributes', {})
-                    # Numbering based on the length of the list so far + 1
-                    current_number = len(local_devices) + 1
-                    local_devices.append({
-                        'number': current_number, # Sequential numbering
+                    accumulated_devices.append({
+                        'number': len(accumulated_devices) + 1,
                         'name': d.get('description') or 'No Name',
                         'ip': attrs.get('IPAddress', 'N/A'),
                         'model': attrs.get('InformaCastDeviceType', 'N/A'),
@@ -52,17 +54,19 @@ def run_sync():
                     })
                     seen_ids.add(d['id'])
 
-            current_offset += len(data) # Force move to next page
+            # THE FIX: Advance offset by the number of items received
+            current_offset += len(data)
             
             with state_lock:
                 state["offset"] = current_offset
-                state["total"] = len(local_devices)
-                state["devices"] = local_devices
+                state["total"] = len(accumulated_devices)
+                state["devices"] = accumulated_devices # Push the whole list to UI
 
-            if len(data) < limit or len(local_devices) > 16000: break 
+            # If we got fewer than 100 items, we are on the last page
+            if len(data) < limit: break
             time.sleep(0.01)
         except Exception as e:
-            print(f">>> ERROR: {e}", file=sys.stderr); break
+            print(f">>> ERROR during fetch: {e}", file=sys.stderr); break
 
     with state_lock:
         state["is_syncing"] = False
