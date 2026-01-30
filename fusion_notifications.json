@@ -1,0 +1,396 @@
+[
+    {
+        "confirmationResponseCounts": {},
+        "expiresAt": null,
+        "deviceGroups": [],
+        "permissions": [
+            "get",
+            "delete"
+        ],
+        "confirmableCount": 5,
+        "incidentId": null,
+        "initiationBroadcast": null,
+        "messageTemplateId": "596f1db8-ece7-11f0-a695-450e7cf1ea3c",
+        "initiator": {
+            "email": "afharris@nic.edu",
+            "name": "Alex Harris",
+            "type": "regular",
+            "id": "8359c12a-852d-11e8-b1a1-25720024e485",
+            "createdAt": "2018-07-11T17:11:55.852Z"
+        },
+        "initiatingEndpointId": null,
+        "parentNotificationId": null,
+        "confirmationRequestId": null,
+        "scenarioNotificationCreatedAt": null,
+        "ttsType": "none",
+        "followUpAllowed": true,
+        "audioFiles": [],
+        "initiationDetails": null,
+        "initiationSourceId": null,
+        "initiationSourceClientId": "cirrus_admin_v2",
+        "additionalDeviceRecipients": null,
+        "alertTone": "default",
+        "facilityId": "69dab71b-12b2-11e8-bfe3-41154f2b6534",
+        "draft": false,
+        "initiationSourceType": "api",
+        "imageFiles": [],
+        "priority": "normal",
+        "id": "8805d7eb-ece7-11f0-913c-df4302ce8200",
+        "messageTemplate": {
+            "name": "NIC 2026 Test Group",
+            "priority": "normal"
+        },
+        "confirmationRequest": null,
+        "initiationSourceDescription": null,
+        "ttsSpeed": "normal",
+        "image": 0,
+        "initiatorId": "8359c12a-852d-11e8-b1a1-25720024e485",
+        "distributionLists": [],
+        "audio": 0,
+        "imageMimeType": null,
+        "scenarioNotificationId": null,
+        "progress": {
+            "percentComplete": 100
+        },
+        "ttsCustomContent": "",
+        "body": "Hello fellow NIC Informacast users. I put this group together for testing and practice.\n\nAlex",
+        "notificationSource": "administration-console",
+        "createdAt": "2026-01-08T23:12:41.217Z",
+        "metadata": null,
+        "subject": "Welcome to the NIC Informacast test user group.",
+        "ttsVoiceId": "751de142-841a-11ea-a32f-17f989f7588d",
+        "abortedAt": null,
+        "users": [],
+        "notificationProfile": {
+            "default": true,
+            "name": "Default",
+            "settings": [
+                {
+                    "disabled": true,
+                    "name": "Apple Production Push \u03bc",
+                    "value": null,
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {},
+                        "disabled": false
+                    },
+                    "id": "839771a8-4915-11e6-8b2f-d310e58d9c03",
+                    "disabledAtSendTime": true,
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": true,
+                    "name": "WNS \u03bc",
+                    "value": null,
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {},
+                        "disabled": false
+                    },
+                    "id": "acb4e1a4-d029-11ea-b857-a730b507a69c",
+                    "disabledAtSendTime": true,
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": false,
+                    "name": "Apple Dev Push \u03bc",
+                    "value": null,
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {},
+                        "disabled": false
+                    },
+                    "id": "1a172e36-3f02-11e6-9617-9fc8b50f4de1",
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": true,
+                    "name": "Google \u03bc",
+                    "value": null,
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {},
+                        "disabled": false
+                    },
+                    "id": "5a181177-3f02-11e6-9617-6bb7c7eddc0e",
+                    "disabledAtSendTime": true,
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": false,
+                    "name": "Apple QA Push \u03bc",
+                    "value": null,
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {},
+                        "disabled": false
+                    },
+                    "id": "5fdb030c-18e7-11e7-9f96-273f619cf339",
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": true,
+                    "name": "Microsoft Teams Chat",
+                    "value": null,
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {},
+                        "disabled": false
+                    },
+                    "id": "f0e5d932-c31f-11e8-b4c1-7831c1bab3f6",
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": false,
+                    "name": "Google QA \u03bc",
+                    "value": null,
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {},
+                        "disabled": false
+                    },
+                    "id": "6ff812ad-18e7-11e7-9f96-1d559a8159e8",
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": false,
+                    "name": "Apple Dev Push \u03bc for desktops",
+                    "value": null,
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {},
+                        "disabled": false
+                    },
+                    "id": "be227b70-d2af-11eb-9747-5d78afe13d0b",
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": false,
+                    "name": "Outbound CAP Push",
+                    "value": {},
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {},
+                        "disabled": false
+                    },
+                    "id": "e1b2db4b-626a-11e7-a3f9-0de43455e893",
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": false,
+                    "name": "Email",
+                    "value": null,
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {
+                            "headingText": "North Idaho College Campus Safety Announcement",
+                            "secondaryTextColor": "#f9410d",
+                            "primaryColor": "#ce200d"
+                        },
+                        "disabled": false
+                    },
+                    "id": "b6d90e60-2a40-11e5-8134-9a9e6c05013a",
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": true,
+                    "name": "Phone Call",
+                    "value": null,
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {
+                            "introduction": "Alert from North Idaho College Campus Safety"
+                        },
+                        "disabled": false
+                    },
+                    "id": "0a466b30-7670-11e5-ba6e-765ae9d26291",
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": false,
+                    "name": "Desktop Notifier - Fusion",
+                    "value": {
+                        "mainWindow": {
+                            "linkColor": "#0000ff",
+                            "body": {
+                                "bold": false,
+                                "color": "#000000",
+                                "font": "Arial",
+                                "size": 12,
+                                "italic": false
+                            },
+                            "backgroundColor": "#ffffff",
+                            "subject": {
+                                "bold": false,
+                                "color": "#000000",
+                                "font": "Arial",
+                                "size": 12,
+                                "italic": false
+                            }
+                        },
+                        "initialDisplay": "Immediate",
+                        "style": "Normal",
+                        "displaySize": "Medium"
+                    },
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {
+                            "mainWindow": {
+                                "linkColor": "#0000ff",
+                                "body": {
+                                    "bold": false,
+                                    "color": "#000000",
+                                    "font": "Arial",
+                                    "size": 12,
+                                    "italic": false
+                                },
+                                "backgroundColor": "#ffffff",
+                                "subject": {
+                                    "bold": false,
+                                    "color": "#000000",
+                                    "font": "Arial",
+                                    "size": 12,
+                                    "italic": false
+                                }
+                            },
+                            "menuExitEnabled": "allow",
+                            "menuClearEnabled": "allow",
+                            "initialDisplay": "Immediate",
+                            "style": "Normal",
+                            "displaySize": "Medium",
+                            "menuStopEnabled": "allow",
+                            "logoId": "ae5fd6f4-ccba-11e8-b3c3-0d4ad878bb5d"
+                        },
+                        "disabled": false
+                    },
+                    "id": "56d6e006-542e-11e6-ae77-e3b4cf41fce9",
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": true,
+                    "name": "Fusion Device",
+                    "value": {
+                        "scrollRepetitions": 10,
+                        "messageType": "Text and Pre-Recorded Audio",
+                        "repetitionPause": null,
+                        "scrollSpeed": 2,
+                        "repeatIndefinitely": false,
+                        "synchronizedDelivery": true,
+                        "duration": 10,
+                        "volume": "Maximum",
+                        "queuedFailureDeviceGroupId": null,
+                        "concatenateText": false,
+                        "skipPhonesInUse": false,
+                        "priority": 1,
+                        "ringtone": false,
+                        "scrollDuration": null,
+                        "queuedSendThreshold": null,
+                        "repetitions": null,
+                        "queuedFailureText": null,
+                        "persistentText": true
+                    },
+                    "attachments": [
+                        {
+                            "name": "mainAudio",
+                            "size": 8058,
+                            "id": "a884507b-1913-11ed-ae96-5bfea57ab938",
+                            "fileName": "silence.wav",
+                            "url": "https://api.icmobile.singlewire.com/api/v1/notification-profiles/2a5f8781-4c92-11e8-bd55-358747e67ac3/settings/e322d549-4e80-11e6-af2d-9baf604d14b0/attachments/a884507b-1913-11ed-ae96-5bfea57ab938",
+                            "contentType": "audio/wav",
+                            "metadata": {
+                                "codecTimeBase": "1/8000",
+                                "encoding": "ulaw",
+                                "bitRate": 64000,
+                                "channels": 1,
+                                "frameRate": 8000,
+                                "seconds": 1.0,
+                                "sampleFmt": "s16",
+                                "frameLength": 8000,
+                                "timeBase": "1/8000",
+                                "codecLongName": "PCM mu-law / G.711 mu-law",
+                                "codecName": "pcm_mulaw",
+                                "bitsPerSample": 8
+                            }
+                        }
+                    ],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {
+                            "scrollRepetitions": 10,
+                            "messageType": "Text and Pre-Recorded Audio",
+                            "repetitionPause": null,
+                            "scrollSpeed": 2,
+                            "repeatIndefinitely": false,
+                            "synchronizedDelivery": true,
+                            "duration": 10,
+                            "volume": "Maximum",
+                            "queuedFailureDeviceGroupId": null,
+                            "concatenateText": false,
+                            "skipPhonesInUse": false,
+                            "priority": 1,
+                            "ringtone": false,
+                            "scrollDuration": null,
+                            "queuedSendThreshold": null,
+                            "repetitions": null,
+                            "queuedFailureText": null,
+                            "persistentText": true
+                        },
+                        "disabled": false
+                    },
+                    "id": "e322d549-4e80-11e6-af2d-9baf604d14b0",
+                    "disabledAtSendTime": true,
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": false,
+                    "name": "SMS",
+                    "value": {
+                        "includeBody": true
+                    },
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {
+                            "introduction": "North Idaho College Campus Safety",
+                            "includeBody": true
+                        },
+                        "disabled": false
+                    },
+                    "id": "17c57b50-833d-11e5-b222-def38c5ff9e6",
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                },
+                {
+                    "disabled": true,
+                    "name": "Apple Production Push \u03bc for desktops",
+                    "value": null,
+                    "attachments": [],
+                    "ipSpeakerAssets": [],
+                    "extension": {
+                        "effectiveConfig": {},
+                        "disabled": false
+                    },
+                    "id": "ddca87d8-d2af-11eb-9747-5d78afe13d0b",
+                    "disabledAtSendTime": true,
+                    "notificationProfileId": "2a5f8781-4c92-11e8-bd55-358747e67ac3"
+                }
+            ],
+            "facilityId": "69dab71b-12b2-11e8-bfe3-41154f2b6534",
+            "id": "2a5f8781-4c92-11e8-bd55-358747e67ac3",
+            "isShared": true,
+            "createdAt": "2018-04-30T16:18:49.464Z"
+        },
+        "recipientCount": 5
+    }
+]
